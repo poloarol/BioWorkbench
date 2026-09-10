@@ -1,6 +1,5 @@
 /data
 /env
-/models
 *.pyc
 
 .streamlit/secrets.toml
