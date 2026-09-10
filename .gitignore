@@ -1,2 +1,7 @@
 /data
 /env
+*.pyc
+
+.streamlit/secrets.toml
+
+src/__pycache__/**/*

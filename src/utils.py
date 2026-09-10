@@ -2,7 +2,7 @@
 import scanpy as sc
 
 
-def load(filepath: str, 
+def load_data(filepath: str, 
             cell_columns: list[str] = None, 
             genes: list[str] = None,
             is_spatial: bool = False) -> dict[str, sc.AnnData]:
@@ -30,10 +30,12 @@ def load(filepath: str,
     if genes is None and cell_columns is None:
         adata = sc.read(filepath)
         calculate_qc_metrics(adata)
+        adata.layers['raw'] = adata.X.copy()
     else:
         adata = sc.read(filepath, backed='r')
         sdata = adata[cell_columns, genes].copy()
         calculate_qc_metrics(sdata)
+        sdata.layers['raw'] = sdata.X.copy()
     
     if is_spatial:
         ...
