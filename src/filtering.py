@@ -19,9 +19,13 @@ def _filter_cells(adata: sc.AnnData, min_genes: int = 200) -> sc.AnnData:
     """
     
     # Filter cells based on the specified criteria
-    filtered_adata = adata[(adata.obs['n_genes'] >= min_genes), :].copy()
-    
-    return filtered_adata
+    cell_subset, number_per_cell = sc.pp.filter_cells(
+        adata,
+        min_genes=min_genes,
+        inplace=False
+    )
+
+    return adata[cell_subset, :].copy()
 
 def _filter_genes(adata: sc.AnnData, min_cells: int = 3) -> sc.AnnData:
     """
@@ -37,11 +41,16 @@ def _filter_genes(adata: sc.AnnData, min_cells: int = 3) -> sc.AnnData:
     - filtered_adata: sc.AnnData
         The filtered AnnData object.
     """
-    
-    # Filter genes based on the specified criteria
-    filtered_adata = adata[:, (adata.var['n_cells'] >= min_cells)].copy()
-    
-    return filtered_adata
+
+
+    gene_subset, number_per_gene = sc.pp.filter_genes(
+        adata,
+        min_cells=min_cells,
+        inplace=False
+    )
+
+    return adata[:, gene_subset].copy()
+
 
 def _filter_mitochondrial_genes(adata: sc.AnnData, max_mt_percentage: float = 20) -> sc.AnnData:
     """
