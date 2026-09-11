@@ -6,6 +6,21 @@ The application takes an **AnnData (`.h5ad`) object** as input and provides an i
 
 The project is being developed as a modular computational biology workbench, with planned support for **spatial transcriptomics and spatial imaging datasets**, including **10x Visium, Visium HD, MERFISH, and related spatial modalities**.
 
+## Project History
+
+BioWorkbench is a Python/Streamlit rewrite and extension of an earlier
+R Shiny application for interactive single-cell transcriptomics analysis.
+
+**Previous implementation:**  
+[Single-Cell Transcriptomics App](https://github.com/poloarol/single-cell-transcriptomics-app)
+
+The original application provided interactive quality control, dimensionality
+reduction, clustering, visualization, and cell-type annotation. BioWorkbench
+reimplements these capabilities using Python and the AnnData/Scanpy ecosystem
+while introducing a modular architecture designed for future single-cell and
+spatial transcriptomics workflows.
+
+
 ---
 
 ## Overview
