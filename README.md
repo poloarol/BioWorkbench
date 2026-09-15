@@ -1,210 +1,202 @@
-# 🧬 BioWorkbench
+# BioWorkbench
 
-**BioWorkbench** is a lightweight, interactive Streamlit application for exploratory analysis of single-cell transcriptomics data.
+**An interactive computational workbench for single-cell and spatial genomics.**
 
-The application takes an **AnnData (`.h5ad`) object** as input and provides an interactive workflow for quality control, filtering, dimensionality reduction, clustering, visualization, marker-gene exploration, and model-based cell-type annotation using [CellTypist](https://www.celltypist.org/).
+BioWorkbench is a lightweight Streamlit application for exploring, analyzing, and visualizing single-cell and spatial genomics datasets.
 
-The project is being developed as a modular computational biology workbench, with planned support for **spatial transcriptomics and spatial imaging datasets**, including **10x Visium, Visium HD, MERFISH, and related spatial modalities**.
+The project is designed to provide an interactive layer on top of reproducible computational workflows — allowing researchers to explore quality control metrics, dimensionality reduction, clustering, cell-type annotations, and spatial organization without having to repeatedly modify analysis code.
 
-## Project History
-
-BioWorkbench is a Python/Streamlit rewrite and extension of an earlier
-R Shiny application for interactive single-cell transcriptomics analysis.
-
-**Previous implementation:**  
-[Single-Cell Transcriptomics App](https://github.com/poloarol/single-cell-transcriptomics-app)
-
-The original application provided interactive quality control, dimensionality
-reduction, clustering, visualization, and cell-type annotation. BioWorkbench
-reimplements these capabilities using Python and the AnnData/Scanpy ecosystem
-while introducing a modular architecture designed for future single-cell and
-spatial transcriptomics workflows.
-
-
----
+> **Status:** Active development
 
 ## Overview
 
-BioWorkbench is designed to make common single-cell analysis tasks accessible through a lightweight interactive interface while keeping the underlying analysis logic in reusable Python modules.
+Modern single-cell and spatial genomics analyses generate complex datasets that often require substantial computational expertise to explore.
 
-The current workflow is:
+BioWorkbench provides a structured interface for common analysis and visualization tasks while keeping the underlying data in the standard **AnnData** format.
 
-```text
-                    AnnData (.h5ad)
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │  Quality Control │
-                  │   & Filtering    │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │  Normalization   │
-                  │  & HVG selection │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │       PCA        │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ UMAP + Leiden   │
-                  │   Clustering    │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Marker Genes &  │
-                  │ Cluster Summary │
-                  └────────┬────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │    CellTypist   │
-                  │   Annotation    │
-                  └────────┬────────┘
-                           │
-                           ▼
-                 Annotated AnnData
-```
+The application currently focuses on:
 
----
+* Single-cell RNA-seq analysis
+* Cell-level quality control and filtering
+* Dimensionality reduction and clustering
+* Cell-type annotation
+* Interactive exploratory visualization
+* Cell-resolved spatial transcriptomics
+* Platform-aware spatial quality control
+
+The spatial component is being developed around technologies including **MERFISH, Xenium, and CosMx**, with **Visium HD** planned as a separate high-resolution spatial workflow.
 
 ## Current Features
 
-### 🔬 Quality Control & Filtering
+### Single-cell analysis
 
-Upload an `.h5ad` file and interactively configure basic single-cell QC and filtering parameters.
-
-Current filtering options include:
-
-* Minimum genes detected per cell
-* Minimum cells expressing a gene
-* Maximum mitochondrial gene percentage
-* Expected doublet rate
-* Scrublet-based doublet detection
-
-The application retains intermediate AnnData objects so that users can compare:
-
-* Input/subset data
-* Filtered data including predicted doublets
-* Filtered singlet data
-
-QC summaries include:
-
-* Number of cells
-* Genes detected per cell
-* Counts per cell
-* Highly expressed genes
-* Doublet/singlet statistics
-* QC visualizations
-
----
-
-### 📊 Dimensionality Reduction & Clustering
-
-BioWorkbench provides an interactive implementation of a standard Scanpy-based analysis workflow.
-
-#### PCA
-
-The PCA workflow performs:
-
-1. Total-count normalization
-2. Log transformation
-3. Highly variable gene selection
-4. PCA
-
-Parameters can be adjusted interactively, including:
-
-* Number of highly variable genes
-* Number of principal components
-
-#### UMAP & Leiden clustering
-
-Following PCA, users can run:
-
-* Nearest-neighbor graph construction
+* AnnData (`.h5ad`) input
+* Cell and gene filtering
+* Mitochondrial QC
+* Doublet detection with Scrublet
+* Normalization
+* Highly variable gene selection
+* PCA
+* Neighborhood graph construction
 * UMAP
 * Leiden clustering
+* Marker gene analysis
+* CellTypist-based cell-type annotation
+* Custom annotation support
+* Export of processed AnnData objects
 
-Configurable parameters include:
+### Spatial analysis
 
-* Number of neighbors
-* UMAP `min_dist`
-* Leiden resolution
+BioWorkbench is being extended beyond conventional single-cell workflows to support cell-resolved spatial transcriptomics.
 
-The resulting embeddings and cluster labels are stored directly in the AnnData object.
+Current development includes:
 
----
+* Technology selection for spatial datasets
+* Platform-specific filtering parameters
+* Spatial QC visualization
+* Cell-level spatial coordinates
+* Visualization of categorical and continuous spatial features
+* MERFISH-oriented QC metrics
+* Spatial visualization based on standardized `AnnData.obsm["spatial"]` coordinates
 
-### 🧬 Marker Gene Analysis
+The spatial architecture is designed to accommodate differences between technologies rather than treating all spatial datasets as interchangeable.
 
-BioWorkbench automatically identifies marker genes for detected clusters.
+For example, imaging-based platforms such as MERFISH, Xenium, and CosMx may provide cell morphology, segmentation, blank/negative probe information, and transcript-level QC metrics that differ substantially from conventional scRNA-seq QC.
 
-The current implementation uses:
+## Analysis Workflow
 
-* Cluster-level differential expression
-* t-test-based ranking
-* Adjusted p-values
-* Log fold changes
-* Marker scores
-
-The interface displays the top marker genes for each cluster and provides a cluster-level summary including cell counts and proportions.
-
----
-
-### 🏷️ Cell-Type Annotation
-
-BioWorkbench integrates **CellTypist** for automated cell-type annotation.
-
-Users can:
-
-1. Browse available CellTypist reference models
-2. Select a reference model
-3. Run model-based annotation
-4. Apply CellTypist majority voting
-5. Inspect annotation confidence scores
-6. Visualize predictions on UMAP embeddings
-
-The resulting annotations are stored in `adata.obs`, including:
+The current single-cell workflow follows a modular analysis structure:
 
 ```text
-celltypist_predicted_labels
-celltypist_majority_voting
-celltypist_conf_score
+AnnData
+   │
+   ▼
+Quality Control & Filtering
+   │
+   ▼
+Normalization
+   │
+   ▼
+Highly Variable Genes
+   │
+   ▼
+PCA
+   │
+   ▼
+Neighbourhood Graph
+   │
+   ▼
+UMAP / Leiden Clustering
+   │
+   ▼
+Marker Genes
+   │
+   ▼
+Cell-type Annotation
+   │
+   ▼
+Processed AnnData
 ```
 
-The application also supports uploading custom JSON-based annotations for additional annotation workflows.
+For spatial datasets, the workflow is being extended with platform-aware QC and spatial visualization:
 
----
+```text
+Spatial AnnData
+      │
+      ▼
+Technology-specific QC
+      │
+      ├── Cell-level metrics
+      ├── Transcript / count metrics
+      ├── Blank / negative probe metrics
+      └── Morphology / segmentation metrics
+      │
+      ▼
+Spatial Visualization
+      │
+      ▼
+Spatial Analysis
+```
 
-### 💾 Export
+## Spatial Data Model
 
-Processed AnnData objects can be exported directly from the application as `.h5ad` files.
+BioWorkbench uses `AnnData` as the common data structure while recognizing that different spatial technologies represent biological space differently.
 
-Marker-gene results can also be exported from the clustering workflow.
+### Cell-resolved spatial technologies
 
----
+For technologies such as:
 
-## Technology Stack
+* MERFISH
+* Xenium
+* CosMx
 
-BioWorkbench is built primarily with the Python scientific-computing ecosystem.
+the primary analytical unit can be represented as:
 
-| Component            | Technology                  |
-| -------------------- | --------------------------- |
-| Application          | Streamlit                   |
-| Data structure       | AnnData                     |
-| Single-cell analysis | Scanpy                      |
-| Cell-type annotation | CellTypist                  |
-| Doublet detection    | Scrublet                    |
-| Data manipulation    | Pandas                      |
-| Visualization        | Matplotlib, Plotly, Seaborn |
-| Language             | Python                      |
+```text
+cell × gene
+```
 
----
+with spatial coordinates stored in:
+
+```python
+adata.obsm["spatial"]
+```
+
+and cell-level metadata stored in:
+
+```python
+adata.obs
+```
+
+This allows BioWorkbench to use a common visualization layer while retaining technology-specific QC and metadata.
+
+### High-resolution spatial transcriptomics
+
+Visium HD is being treated as a distinct workflow because its analytical units are high-resolution spatial bins rather than inherently segmented cells.
+
+Planned support will therefore address:
+
+* Bin-level QC
+* Tissue image visualization
+* Spatial clustering
+* Spatially variable genes
+* Tissue domains
+* Cell-type composition / deconvolution
+
+## Configuration
+
+Analysis parameters are being separated from the Streamlit interface using YAML configuration.
+
+For example:
+
+```text
+config/
+└── params.yaml
+```
+
+This allows filtering parameters to vary according to dataset type and spatial technology rather than applying conventional scRNA-seq thresholds indiscriminately.
+
+Conceptually:
+
+```yaml
+single_cell:
+  ...
+
+spatial:
+  MERFISH:
+    ...
+
+  Xenium:
+    ...
+
+  CosMX:
+    ...
+
+  Visium HD:
+    ...
+```
+
+This design is intended to make platform-specific analysis behavior explicit, reproducible, and easier to extend.
 
 ## Project Structure
 
@@ -224,287 +216,130 @@ BioWorkbench/
 │   ├── plotting.py
 │   └── utils.py
 │
-└── notebooks/
+├── config/
+│   └── params.yaml
+│
+├── notebooks/
+│
+└── README.md
 ```
 
-### `app.py`
+The application separates the Streamlit interface from computational and visualization logic wherever practical.
 
-Defines the Streamlit application and navigation between analysis modules.
+## Technology Stack
 
-### `pages/`
+BioWorkbench is built primarily with Python and the scientific Python ecosystem.
 
-Contains the user-facing Streamlit workflows:
+* **Python**
+* **Streamlit** — interactive application interface
+* **AnnData** — data structure
+* **Scanpy** — single-cell analysis
+* **Squidpy** — spatial analysis and visualization
+* **CellTypist** — cell-type annotation
+* **Scrublet** — doublet detection
+* **Pandas** — data manipulation
+* **NumPy** — numerical computing
+* **Matplotlib / Seaborn / Plotly** — visualization
 
-* `01_filtering.py` — QC, filtering, and doublet detection
-* `02_clustering.py` — PCA, UMAP, Leiden clustering, and marker analysis
-* `03_annotation.py` — CellTypist and custom annotation
+## Design Philosophy
 
-### `src/`
+BioWorkbench is not intended to replace specialized analysis pipelines or computational workflows.
 
-Contains reusable computational functions separated from the Streamlit interface:
+Instead, it provides an **interactive analytical workbench** on top of those workflows.
 
-* `filtering.py` — cell/gene filtering and doublet detection
-* `clustering.py` — normalization, HVG selection, PCA, UMAP, clustering, and marker identification
-* `plotting.py` — visualization functions
-* `utils.py` — data loading, QC metric calculation, and AnnData utilities
+The goal is to separate:
 
-This separation is intended to allow the computational components to evolve independently of the user interface.
+```text
+Reproducible computational analysis
+              │
+              ▼
+        Validated results
+              │
+              ▼
+        BioWorkbench
+              │
+              ▼
+ Interactive exploration & visualization
+```
 
----
+This makes the application useful both as a research tool and as a potential interface for delivering computational analyses to collaborators and clients.
 
-## Installation
+## Roadmap
 
-Clone the repository:
+### Single-cell
+
+* [x] AnnData input
+* [x] QC and filtering
+* [x] Doublet detection
+* [x] PCA
+* [x] UMAP
+* [x] Leiden clustering
+* [x] Marker gene analysis
+* [x] CellTypist annotation
+* [x] Custom annotations
+* [ ] Expanded differential expression
+* [ ] Improved analysis provenance
+* [ ] Project-level configuration
+
+### Spatial transcriptomics
+
+#### Cell-resolved
+
+* [x] Spatial technology selection
+* [x] Platform-aware filtering configuration
+* [x] Spatial coordinate handling
+* [x] Spatial QC visualization
+* [x] MERFISH-oriented workflows
+* [ ] Xenium workflows
+* [ ] CosMx workflows
+* [ ] Spatial domains
+* [ ] Spatially variable genes
+
+#### High-resolution
+
+* [ ] Visium HD
+* [ ] Tissue image integration
+* [ ] Bin-level QC
+* [ ] Spatial clustering
+* [ ] Spatially variable genes
+* [ ] Tissue domains
+* [ ] Cell-type composition / deconvolution
+
+## Development
+
+Clone the repository and create a Python environment:
 
 ```bash
 git clone https://github.com/poloarol/BioWorkbench.git
 cd BioWorkbench
+
+python -m venv env
 ```
 
-Create a virtual environment:
+Activate the environment and install the project dependencies.
 
-```bash
-python -m venv .venv
-```
-
-Activate it on macOS/Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-On Windows:
-
-```powershell
-.venv\Scripts\activate
-```
-
-Install the required Python packages:
-
-```bash
-pip install streamlit scanpy celltypist scrublet pandas matplotlib seaborn plotly
-```
-
-> A dedicated dependency file will be added as the project matures.
-
----
-
-## Running BioWorkbench
-
-Start the Streamlit application with:
+Then launch the application with:
 
 ```bash
 streamlit run app.py
 ```
 
-The application will open in your browser.
+## Project Status
 
-Upload an `.h5ad` file from the **Cell and Gene Filtering** page to begin the analysis.
+BioWorkbench is an evolving project.
 
----
+The single-cell workflow provides the foundation, while the current development effort is expanding the application toward **cell-resolved and high-resolution spatial genomics**.
 
-## Input Data
-
-The current version expects an **AnnData `.h5ad` file** containing a gene-expression matrix.
-
-The basic data model is:
-
-```text
-AnnData
-├── X       expression matrix
-├── obs     cell metadata
-├── var     gene metadata
-├── obsm    embeddings
-├── uns     unstructured analysis metadata
-└── layers  alternative expression matrices
-```
-
-BioWorkbench calculates common QC metrics and maintains the AnnData object throughout the analysis workflow.
-
----
-
-## Example Workflow
-
-A typical analysis might look like:
-
-```text
-1. Upload .h5ad
-       ↓
-2. Inspect QC metrics
-       ↓
-3. Filter low-quality cells and genes
-       ↓
-4. Identify potential doublets
-       ↓
-5. Remove predicted doublets
-       ↓
-6. Normalize expression data
-       ↓
-7. Identify highly variable genes
-       ↓
-8. Run PCA
-       ↓
-9. Construct neighborhood graph
-       ↓
-10. Run UMAP
-       ↓
-11. Run Leiden clustering
-       ↓
-12. Identify cluster marker genes
-       ↓
-13. Annotate cell types with CellTypist
-       ↓
-14. Inspect annotations on UMAP
-       ↓
-15. Export processed AnnData
-```
-
----
-
-## Roadmap
-
-BioWorkbench is currently focused on **single-cell transcriptomics**, but the project is intended to expand into a broader computational workbench for single-cell and spatial biology.
-
-### Current
-
-* [x] AnnData input
-* [x] QC metric calculation
-* [x] Cell filtering
-* [x] Gene filtering
-* [x] Mitochondrial filtering
-* [x] Doublet detection
-* [x] PCA
-* [x] Highly variable gene selection
-* [x] UMAP
-* [x] Leiden clustering
-* [x] Marker-gene identification
-* [x] CellTypist annotation
-* [x] Custom annotations
-* [x] Processed AnnData export
-
-### Planned
-
-#### Spatial transcriptomics
-
-* [ ] Spatial AnnData loading
-* [ ] Visium support
-* [ ] Visium HD support
-* [ ] Spatial quality control
-* [ ] Tissue-coordinate visualization
-* [ ] Spatial clustering/domain identification
-* [ ] Spatially variable gene analysis
-* [ ] Spatial marker analysis
-
-#### Imaging-based spatial transcriptomics
-
-* [ ] MERFISH support
-* [ ] Xenium support
-* [ ] Cell-coordinate visualization
-* [ ] Segmentation-aware visualization
-* [ ] Transcript-level spatial visualization
-* [ ] Cell neighborhood analysis
-* [ ] Cell-cell interaction analysis
-
-#### Expanded annotation
-
-* [ ] Spatially aware cell-type annotation
-* [ ] Multiple annotation models
-* [ ] Marker-based annotation
-* [ ] Interactive annotation editing
-* [ ] Annotation confidence and uncertainty visualization
-
-#### Software engineering
-
-* [ ] Formal dependency management
-* [ ] Automated testing
-* [ ] Containerized deployment
-* [ ] Improved session-state management
-* [ ] Modular dataset abstraction
-* [ ] Reproducible analysis configurations
-* [ ] Expanded documentation
-
----
-
-## Design Philosophy
-
-BioWorkbench is intended to sit between a full computational pipeline and a purely visual data explorer.
-
-The goal is to provide:
-
-**Interactive analysis**
-
-Allow users to explore datasets and adjust common analysis parameters without repeatedly modifying scripts.
-
-**Modularity**
-
-Keep analysis functions separate from the user interface so that individual components can be reused in scripts, notebooks, pipelines, or future interfaces.
-
-**AnnData-first workflows**
-
-Use AnnData as the central representation for expression data and analysis results.
-
-**Extensibility**
-
-Design the application so that the same interface can eventually support multiple biological modalities rather than building independent applications for every data type.
-
----
-
-## Future Direction
-
-The longer-term goal is to extend BioWorkbench from a single-cell analysis interface into a lightweight computational workbench for **single-cell and spatial biology**.
-
-The planned architecture will allow different modalities to share common analytical components while exposing modality-specific functionality where appropriate.
-
-```text
-                         BioWorkbench
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-        Single-cell                      Spatial Biology
-              │                               │
-        ┌─────┴─────┐              ┌──────────┼──────────┐
-        │           │              │          │          │
-      scRNA-seq   Other          Visium    MERFISH    Xenium
-                   assays         /HD
-        │           │              │          │          │
-        └───────────┴──────────────┴──────────┴──────────┘
-                              │
-                              ▼
-                    Shared computational
-                         components
-                              │
-                  ┌───────────┼───────────┐
-                  │           │           │
-                 QC      Visualization  Annotation
-                  │           │           │
-                  └───────────┼───────────┘
-                              │
-                              ▼
-                       Biological insight
-```
-
-The objective is not to replace established single-cell or spatial analysis frameworks, but to provide a **lightweight interactive layer** for exploration, visualization, annotation, and downstream analysis.
-
----
-
-## Status
-
-🚧 **Active development**
-
-The current release is primarily a **single-cell transcriptomics workbench**. Spatial functionality is planned and the codebase is being developed with future spatial data support in mind.
-
----
+The architecture is intentionally being developed around modular analysis components, platform-aware configuration, and standardized biological data structures so that additional spatial technologies can be incorporated without duplicating the entire analysis framework.
 
 ## Author
 
-**Paul Wambo**
+**Paul A. Wambo**
 
-Computational scientist working across bioinformatics, machine learning, and computational biology.
+Computational scientist working at the intersection of computational biology, machine learning, and scientific software.
 
 GitHub: [@poloarol](https://github.com/poloarol)
 
 ---
 
-## License
-
-License information will be added as the project matures.
+*BioWorkbench is developed as an open computational tool for exploratory analysis and visualization of single-cell and spatial genomics data.*
