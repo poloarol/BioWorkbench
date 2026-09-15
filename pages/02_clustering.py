@@ -67,7 +67,12 @@ with st.sidebar:
 # Dataset overview
 # -----------------------------------------------------------------------------
 
-adata = st.session_state.adatas['filtered_wout_doublets']
+adata = None
+
+if not st.session_state.is_spatial:
+    adata = st.session_state.adatas['filtered_wout_doublets']
+else:
+    adata = st.session_state.adatas['filtered_wout_blanks']
 
 # -----------------------------------------------------------------------------
 # Pipeline controls
@@ -216,8 +221,8 @@ if "highly_variable" in adata.var:
         use_container_width=True,
     )
 
-
-adata = identify_marker_genes(adata, groupby="cluster_label")
+if 'cluster_label' in adata.obs:
+    adata = identify_marker_genes(adata, groupby="cluster_label")
 
 # -----------------------------------------------------------------------------
 # Marker genes

@@ -1,0 +1,28 @@
+single_cell:
+  min_genes: 200
+  min_cells: 3
+  max_mito_percent: 20
+  expected_doublet_rate: 0.05
+
+spatial:
+  MERFISH:
+    min_genes: 15
+    min_cells: 3
+    blank_threshold: 5
+
+  Xenium:
+    min_genes: 15
+    min_cells: 3
+    blank_threshold: 5
+
+  CosMX:
+    min_genes: 15
+    min_cells: 3
+    blank_threshold: 5
+
+
+  Visium HD:
+    min_genes: 100
+    min_cells: 3
+    max_mito_percent: 1
+    expected_doublet_rate: 0.01

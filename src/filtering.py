@@ -92,11 +92,33 @@ def _identify_doublets(adata: sc.AnnData, expected_doublet_rate: float = 0.05) -
     
     return adata
 
+def _identify_blanks(adata: sc.AnnData, max_blank_percentage: float = 5) -> sc.AnnData:
+    """
+    Identify potential blank droplets in an AnnData object based on the fraction of blank counts.
+
+    Parameters:
+    - adata: sc.AnnData
+        The AnnData object to analyze.
+    - max_blank_percentage: float, optional
+        Maximum percentage of blank counts allowed in a cell. Default is 5%.
+
+    Returns:
+    - filtered_adata: sc.AnnData
+        The filtered AnnData object.
+    """
+
+    # Filter cells based on the specified criteria
+    adata.obs['is_blank'] = adata.obs["pct_counts_blank"] > max_blank_percentage
+    return adata
+
+
 def data_filtering(adata, 
            min_genes: int = 200, 
            min_cells: int = 3, 
            max_mt_percentage: float = 20, 
-           expected_doublet_rate: float = 0.05) -> sc.AnnData:
+           expected_doublet_rate: float = 0.05,
+           blank_max_percentage: float = 5,
+           is_spatial: bool = False) -> sc.AnnData:
     """
     Filter an AnnData object based on quality control metrics.
 
@@ -111,6 +133,10 @@ def data_filtering(adata,
         Maximum percentage of mitochondrial genes allowed in a cell. Default is 20%.
     - expected_doublet_rate: float, optional
         Expected doublet rate in the dataset. Default is 0.05 (5%).
+    - is_spatial: bool, optional
+        Indicates whether the dataset is spatial. Default is False.
+    - blank_max_percentage: float, optional
+        Maximum percentage of blank counts allowed in a cell for spatial datasets. Default is 5%.
 
     Returns:
     - filtered_adata: sc.AnnData
@@ -123,10 +149,15 @@ def data_filtering(adata,
     # Filter genes based on the specified criteria
     adata = _filter_genes(adata, min_cells)
     
-    # Filter cells based on mitochondrial gene percentage
-    adata = _filter_mitochondrial_genes(adata, max_mt_percentage)
+    if not is_spatial:
+        # Filter cells based on mitochondrial gene percentage
+        adata = _filter_mitochondrial_genes(adata, max_mt_percentage)
+        
+        # Identify potential doublets in the dataset
+        adata = _identify_doublets(adata, expected_doublet_rate)
     
-    # Identify potential doublets in the dataset
-    adata = _identify_doublets(adata, expected_doublet_rate)
+    else:
+        # Identify potential blank droplets in the dataset
+        adata = _identify_blanks(adata, max_blank_percentage=blank_max_percentage)
     
     return adata

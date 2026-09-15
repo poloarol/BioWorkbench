@@ -1,6 +1,7 @@
 
 import scanpy as sc
-
+import squidpy as sq
+import numpy as np
 
 def load_data(filepath: str, 
             cell_columns: list[str] = None, 
@@ -29,38 +30,70 @@ def load_data(filepath: str,
     
     if genes is None and cell_columns is None:
         adata = sc.read(filepath)
-        calculate_qc_metrics(adata)
+        _calculate_qc_metrics(adata, is_spatial=is_spatial)
         adata.layers['raw'] = adata.X.copy()
+        
+        if is_spatial:
+            blank_genes = adata.var_names[adata.var_names.str.startswith("Blank-")].tolist()
+            blank_counts = adata[:, blank_genes].X.sum(axis=1)
+            adata.obs["blank_counts"] = blank_counts
+            adata.obs["pct_counts_blank"] = (
+                adata.obs["blank_counts"] / adata.obs["total_counts"]
+            ) * 100
+            adata.obsm["spatial"] = adata.obs[["center_x", "center_y"]].to_numpy()
     else:
         adata = sc.read(filepath, backed='r')
         sdata = adata[cell_columns, genes].copy()
-        calculate_qc_metrics(sdata)
+        _calculate_qc_metrics(sdata, is_spatial=is_spatial)
         sdata.layers['raw'] = sdata.X.copy()
-    
-    if is_spatial:
-        ...
+        if is_spatial:
+            blank_genes = sdata.var_names[sdata.var_names.str.startswith("Blank-")].tolist()
+            blank_counts = sdata[:, blank_genes].X.sum(axis=1)
+            sdata.obs["blank_counts"] = blank_counts
+            sdata.obs["pct_counts_blank"] = (
+                sdata.obs["blank_counts"] / sdata.obs["total_counts"]
+            ) * 100
+            sdata.obsm["spatial"] = sdata.obs[["center_x", "center_y"]].to_numpy()
     
     return {'raw': adata, 'subset': sdata}
 
 
-def calculate_qc_metrics(adata: sc.AnnData, metrics: list[str] = ['mt', 'ribo']) -> None:
+def _calculate_qc_metrics(adata, is_spatial=False):
     """
-    Calculate quality control metrics for an AnnData object.
+    Calculate QC metrics for an AnnData object.
 
-    Parameters:
-    - adata: sc.AnnData
-        The AnnData object to calculate QC metrics for.
-    - metrics: list[str]
-        A list of metrics to calculate. Default is ['mt', 'ribo'].
+    For spatial/MERFISH data, calculate the standard cell/spot
+    metrics without top-N gene percentages.
 
-    Returns:
-    - None
-        The function modifies the AnnData object in place.
+    For single-cell data, calculate additional QC metrics based
+    on available gene annotations.
     """
-    adata.var_names_make_unique()
+
+    if is_spatial:
+        sc.pp.calculate_qc_metrics(
+            adata,
+            percent_top=None,
+            inplace=True,
+        )
+        return
+
+    # --------------------------------------------------------
+    # Single-cell QC
+    # --------------------------------------------------------
+
+    # mitochondrial genes, "MT-" for human, "Mt-" for mouse
     adata.var["mt"] = adata.var_names.str.startswith("MT-")
+    # ribosomal genes
     adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
-    sc.pp.calculate_qc_metrics(adata, qc_vars=metrics, inplace=True, log1p=True)
+    # hemoglobin genes
+    adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
+    sc.pp.calculate_qc_metrics(
+        adata,
+        qc_vars=["mt", "ribo", "hb"],
+        percent_top=None,
+        inplace=True,
+        log1p=True,
+    )
 
 
 def write_to_disk(adata: sc.AnnData, filepath: str) -> None:

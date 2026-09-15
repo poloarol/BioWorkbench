@@ -14,9 +14,12 @@ def get_celltypist_models():
 
     return models.models_description()
 
+adata = None
 selected_model = None
 model_info = get_celltypist_models()
-adata = st.session_state.adatas['clustered']
+
+if 'clustered' in st.session_state.adatas:
+    adata = st.session_state.adatas['clustered']
 
 with st.sidebar:
 
@@ -166,3 +169,6 @@ if "X_umap" in adata.obsm and available_annotations:
                 )
 
                 plt.close(fig)
+
+
+st.session_state.adatas['annotated'] = adata
