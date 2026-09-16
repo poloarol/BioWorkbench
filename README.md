@@ -4,7 +4,7 @@
 
 BioWorkbench is a lightweight Streamlit application for exploring, analyzing, and visualizing single-cell and spatial genomics datasets.
 
-The project is designed to provide an interactive layer on top of reproducible computational workflows — allowing researchers to explore quality control metrics, dimensionality reduction, clustering, cell-type annotations, and spatial organization without having to repeatedly modify analysis code.
+The project provides an interactive layer on top of reproducible computational workflows, allowing researchers to explore quality control metrics, dimensionality reduction, clustering, cell-type annotations, and spatial organization without repeatedly modifying analysis code.
 
 > **Status:** Active development
 
@@ -14,25 +14,30 @@ Modern single-cell and spatial genomics analyses generate complex datasets that 
 
 BioWorkbench provides a structured interface for common analysis and visualization tasks while keeping the underlying data in the standard **AnnData** format.
 
-The application currently focuses on:
+The project currently focuses on:
 
 * Single-cell RNA-seq analysis
-* Cell-level quality control and filtering
-* Dimensionality reduction and clustering
+* Cell and gene quality control
+* Filtering and preprocessing
+* Dimensionality reduction
+* Clustering
+* Marker gene analysis
 * Cell-type annotation
-* Interactive exploratory visualization
 * Cell-resolved spatial transcriptomics
 * Platform-aware spatial quality control
+* Exploratory visualization
 
-The spatial component is being developed around technologies including **MERFISH, Xenium, and CosMx**, with **Visium HD** planned as a separate high-resolution spatial workflow.
+Spatial development is designed to accommodate multiple technologies, including **MERFISH, Xenium, CosMX, and Visium HD**.
 
 ## Current Features
 
 ### Single-cell analysis
 
+BioWorkbench currently provides a modular single-cell analysis workflow including:
+
 * AnnData (`.h5ad`) input
 * Cell and gene filtering
-* Mitochondrial QC
+* Mitochondrial quality control
 * Doublet detection with Scrublet
 * Normalization
 * Highly variable gene selection
@@ -42,26 +47,52 @@ The spatial component is being developed around technologies including **MERFISH
 * Leiden clustering
 * Marker gene analysis
 * CellTypist-based cell-type annotation
-* Custom annotation support
+* Custom cell-type annotations
 * Export of processed AnnData objects
+
+### Exploratory visualization
+
+Reusable plotting functions are provided for exploring analytical results.
+
+Current visualization functionality includes:
+
+* PCA visualization
+* UMAP visualization
+* Categorical variables
+* Continuous variables
+* Automatic categorical color handling
+* Continuous color scales
+* Legends for categorical variables
+* Colorbars for continuous variables
+* Spatial visualization using `AnnData.obsm["spatial"]`
+* Visualization of multiple spatial variables
+
+Categorical variables are displayed as discrete groups, while continuous variables are represented using continuous color scales.
 
 ### Spatial analysis
 
-BioWorkbench is being extended beyond conventional single-cell workflows to support cell-resolved spatial transcriptomics.
+BioWorkbench is being extended beyond conventional single-cell workflows to support **cell-resolved spatial transcriptomics**.
 
-Current development includes:
+The current architecture includes:
 
-* Technology selection for spatial datasets
-* Platform-specific filtering parameters
-* Spatial QC visualization
+* Spatial technology selection
+* Technology-specific configuration
+* Platform-aware filtering
 * Cell-level spatial coordinates
-* Visualization of categorical and continuous spatial features
-* MERFISH-oriented QC metrics
-* Spatial visualization based on standardized `AnnData.obsm["spatial"]` coordinates
+* Spatial quality-control visualization
+* Categorical spatial visualization
+* Continuous spatial visualization
+* MERFISH-oriented QC
 
-The spatial architecture is designed to accommodate differences between technologies rather than treating all spatial datasets as interchangeable.
+Spatial coordinates are standardized through:
 
-For example, imaging-based platforms such as MERFISH, Xenium, and CosMx may provide cell morphology, segmentation, blank/negative probe information, and transcript-level QC metrics that differ substantially from conventional scRNA-seq QC.
+```python
+adata.obsm["spatial"]
+```
+
+The spatial architecture is deliberately platform-aware rather than assuming that all spatial datasets follow the same QC model as scRNA-seq.
+
+For example, imaging-based platforms such as MERFISH, Xenium, and CosMX can provide blank/negative probe measurements, segmentation information, morphology measurements, and other QC metrics that differ from conventional single-cell sequencing assays.
 
 ## Analysis Workflow
 
@@ -83,7 +114,7 @@ Highly Variable Genes
 PCA
    │
    ▼
-Neighbourhood Graph
+Neighborhood Graph
    │
    ▼
 UMAP / Leiden Clustering
@@ -95,10 +126,13 @@ Marker Genes
 Cell-type Annotation
    │
    ▼
+Visualization
+   │
+   ▼
 Processed AnnData
 ```
 
-For spatial datasets, the workflow is being extended with platform-aware QC and spatial visualization:
+For spatial datasets, the workflow incorporates technology-specific QC and spatial visualization:
 
 ```text
 Spatial AnnData
@@ -107,7 +141,7 @@ Spatial AnnData
 Technology-specific QC
       │
       ├── Cell-level metrics
-      ├── Transcript / count metrics
+      ├── Count metrics
       ├── Blank / negative probe metrics
       └── Morphology / segmentation metrics
       │
@@ -120,7 +154,7 @@ Spatial Analysis
 
 ## Spatial Data Model
 
-BioWorkbench uses `AnnData` as the common data structure while recognizing that different spatial technologies represent biological space differently.
+BioWorkbench uses **AnnData** as the common data structure while recognizing that different spatial technologies represent biological space differently.
 
 ### Cell-resolved spatial technologies
 
@@ -128,7 +162,7 @@ For technologies such as:
 
 * MERFISH
 * Xenium
-* CosMx
+* CosMX
 
 the primary analytical unit can be represented as:
 
@@ -148,13 +182,13 @@ and cell-level metadata stored in:
 adata.obs
 ```
 
-This allows BioWorkbench to use a common visualization layer while retaining technology-specific QC and metadata.
+This provides a common interface for spatial visualization while retaining technology-specific metadata and QC metrics.
 
 ### High-resolution spatial transcriptomics
 
-Visium HD is being treated as a distinct workflow because its analytical units are high-resolution spatial bins rather than inherently segmented cells.
+**Visium HD** is treated as a distinct workflow because its analytical units are high-resolution spatial bins rather than inherently segmented cells.
 
-Planned support will therefore address:
+Planned support includes:
 
 * Bin-level QC
 * Tissue image visualization
@@ -163,20 +197,16 @@ Planned support will therefore address:
 * Tissue domains
 * Cell-type composition / deconvolution
 
-## Configuration
+## Platform-Aware Configuration
 
-Analysis parameters are being separated from the Streamlit interface using YAML configuration.
-
-For example:
+Analysis parameters are separated from the Streamlit interface using YAML configuration.
 
 ```text
 config/
 └── params.yaml
 ```
 
-This allows filtering parameters to vary according to dataset type and spatial technology rather than applying conventional scRNA-seq thresholds indiscriminately.
-
-Conceptually:
+The current configuration distinguishes between single-cell and spatial workflows:
 
 ```yaml
 single_cell:
@@ -196,7 +226,16 @@ spatial:
     ...
 ```
 
-This design is intended to make platform-specific analysis behavior explicit, reproducible, and easier to extend.
+This allows filtering behavior to reflect the characteristics of the underlying assay rather than applying conventional scRNA-seq thresholds indiscriminately.
+
+For example, the current spatial configuration includes parameters for:
+
+* Minimum genes
+* Minimum cells
+* Blank-probe thresholds
+* Platform-specific QC behavior
+
+The configuration architecture is intended to make analytical assumptions explicit, reproducible, and easier to extend as additional spatial technologies are implemented.
 
 ## Project Structure
 
@@ -209,12 +248,15 @@ BioWorkbench/
 │   ├── 01_filtering.py
 │   ├── 02_clustering.py
 │   └── 03_annotation.py
+|   |__ 04_visualization.py
+|   |__ 05_download.py
 │
 ├── src/
 │   ├── filtering.py
 │   ├── clustering.py
 │   ├── plotting.py
 │   └── utils.py
+|   |__ visualizer.py
 │
 ├── config/
 │   └── params.yaml
@@ -232,9 +274,9 @@ BioWorkbench is built primarily with Python and the scientific Python ecosystem.
 
 * **Python**
 * **Streamlit** — interactive application interface
-* **AnnData** — data structure
+* **AnnData** — biological data structure
 * **Scanpy** — single-cell analysis
-* **Squidpy** — spatial analysis and visualization
+* **Squidpy** — spatial analysis
 * **CellTypist** — cell-type annotation
 * **Scrublet** — doublet detection
 * **Pandas** — data manipulation
@@ -247,7 +289,7 @@ BioWorkbench is not intended to replace specialized analysis pipelines or comput
 
 Instead, it provides an **interactive analytical workbench** on top of those workflows.
 
-The goal is to separate:
+The intended architecture is:
 
 ```text
 Reproducible computational analysis
@@ -256,13 +298,15 @@ Reproducible computational analysis
         Validated results
               │
               ▼
-        BioWorkbench
+         BioWorkbench
               │
               ▼
  Interactive exploration & visualization
 ```
 
-This makes the application useful both as a research tool and as a potential interface for delivering computational analyses to collaborators and clients.
+This separation allows computationally intensive or reproducibility-critical analysis to remain in dedicated workflows while BioWorkbench provides an accessible interface for downstream exploration.
+
+The same architecture can support both research use and the delivery of computational analyses to collaborators and clients.
 
 ## Roadmap
 
@@ -277,6 +321,9 @@ This makes the application useful both as a research tool and as a potential int
 * [x] Marker gene analysis
 * [x] CellTypist annotation
 * [x] Custom annotations
+* [x] Gene expression visualizer
+* [x] Gene-set / module-score visualization
+* [ ] Categorical domain visualization
 * [ ] Expanded differential expression
 * [ ] Improved analysis provenance
 * [ ] Project-level configuration
@@ -290,8 +337,10 @@ This makes the application useful both as a research tool and as a potential int
 * [x] Spatial coordinate handling
 * [x] Spatial QC visualization
 * [x] MERFISH-oriented workflows
+* [x] Categorical spatial visualization
+* [x] Continuous spatial visualization
 * [ ] Xenium workflows
-* [ ] CosMx workflows
+* [ ] CosMX workflows
 * [ ] Spatial domains
 * [ ] Spatially variable genes
 
@@ -328,9 +377,17 @@ streamlit run app.py
 
 BioWorkbench is an evolving project.
 
-The single-cell workflow provides the foundation, while the current development effort is expanding the application toward **cell-resolved and high-resolution spatial genomics**.
+The current implementation provides the foundation for interactive single-cell analysis and is expanding toward a broader workbench for **single-cell, cell-resolved spatial, and high-resolution spatial genomics**.
 
-The architecture is intentionally being developed around modular analysis components, platform-aware configuration, and standardized biological data structures so that additional spatial technologies can be incorporated without duplicating the entire analysis framework.
+Development is centered around:
+
+* Modular computational components
+* Platform-aware configuration
+* Reusable visualization functions
+* Standardized biological data structures
+* Separation between analytical workflows and exploratory interfaces
+
+The long-term goal is to provide an interactive workbench that can sit on top of validated computational analyses and make their results easier for researchers, collaborators, and clients to explore.
 
 ## Author
 
