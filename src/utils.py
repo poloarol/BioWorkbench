@@ -111,3 +111,37 @@ def write_to_disk(adata: sc.AnnData, filepath: str) -> None:
         The function writes the AnnData object to disk.
     """
     adata.write(filepath)
+
+
+def calculate_module_score(
+    adata: sc.AnnData,
+    genes: list[str],
+    score_name: str = "module_score",
+):
+    """
+    Calculate a module score for a set of genes in an AnnData object.
+
+    Parameters:
+    - adata: sc.AnnData
+        The AnnData object containing the gene expression data.
+    - genes: list[str]
+        A list of gene names to include in the module score.
+    - score_name: str, optional (default="module_score")
+        The name of the column in adata.obs to store the module score.
+
+    Returns:
+    - adata: sc.AnnData
+        The AnnData object with the calculated module score added to adata.obs.
+    """
+    genes = [gene for gene in genes if gene in adata.var_names]
+
+    if not genes:
+        raise ValueError("None of the selected genes were found in the dataset.")
+
+    sc.tl.score_genes(
+        adata,
+        gene_list=genes,
+        score_name=score_name,
+    )
+
+    return adata

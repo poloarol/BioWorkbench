@@ -193,12 +193,21 @@ def plot_pca(
     return fig
 
 
-
 def plot_spatial(
     adata,
     color_by,
     figsize=(18, 6),
 ):
+    """Plot spatial representation of the data.
+
+    Args:
+        adata (sc.AnnData): Annotated data matrix.
+        color_by (str or list of str): Column(s) in `adata.obs` to color the points by.
+        figsize (tuple, optional): Figure size. Defaults to (18, 6).
+
+    Returns:
+        matplotlib.figure.Figure: The resulting figure.
+    """
     if isinstance(color_by, str):
         color_by = [color_by]
 
@@ -224,7 +233,7 @@ def plot_spatial(
             or pd.api.types.is_bool_dtype(values)
         ):
             categories = values.astype("category")
-            category_names = categories.cat.categories
+            category_names = list(categories.cat.categories)
             n_categories = len(category_names)
 
             if n_categories == 2:
@@ -241,7 +250,11 @@ def plot_spatial(
                     for i, category in enumerate(category_names)
                 }
 
-            colors = categories.map(color_map)
+            # Avoid pandas Series.map() MultiIndex issue
+            colors = [
+                color_map.get(category, "gray")
+                for category in categories
+            ]
 
             ax.scatter(
                 adata.obs["center_x"],
@@ -291,8 +304,12 @@ def plot_spatial(
                 pad=0.04,
                 label=variable.replace("_", " ").title(),
             )
-
-        ax.set_title(variable.replace("_", " ").title())
+        
+        ax.set_xlabel("Spatial X")
+        ax.set_ylabel("Spatial Y")
+        ax.set_title(f"Spatial — {variable.replace('_', ' ').title()}")
+        
+        
         ax.set_aspect("equal", adjustable="box")
         ax.margins(0)
         ax.axis("off")
@@ -301,13 +318,23 @@ def plot_spatial(
 
     return fig
 
+
 def plot_umap(
     adata: sc.AnnData,
     color_by: str,
+    figsize: tuple = (8, 6),
 ):
-    """Plot UMAP colored by a categorical or continuous obs column."""
+    """Plot UMAP colored by a categorical or continuous obs column.
+    Args:
+        adata (sc.AnnData): Annotated data matrix.
+        color_by (str): Column in `adata.obs` to color the points by.
+        figsize (tuple, optional): Figure size. Defaults to (8, 6).
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    Returns:
+        matplotlib.figure.Figure: The resulting figure.
+    """
+
+    fig, ax = plt.subplots(figsize=figsize)
 
     values = adata.obs[color_by]
 
