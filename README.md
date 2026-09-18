@@ -357,6 +357,7 @@ Configuration defaults are maintained separately in `config/`.
 * [ ] Xenium support
 * [ ] CosMX support
 * [ ] Visium HD support
+* [ ] Get information of gene(s) based on context - Agentic AI
 * [ ] Tissue image overlays
 * [ ] Segmentation overlays
 * [ ] Additional export functionality
