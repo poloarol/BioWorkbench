@@ -341,6 +341,7 @@ Configuration defaults are maintained separately in `config/`.
 * [x] Spatial coordinate visualization
 * [x] Spatial annotation visualization
 * [x] Spatial-domain identification
+* [x] Spatially variable gene analysis
 
 ### In development
 
@@ -358,7 +359,6 @@ Configuration defaults are maintained separately in `config/`.
 * [ ] Tissue image overlays
 * [ ] Segmentation overlays
 * [ ] Transcript-level visualization
-* [ ] Spatially variable gene analysis
 * [ ] Additional export functionality
 
 ---
