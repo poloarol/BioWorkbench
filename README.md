@@ -341,7 +341,7 @@ The same architecture can support both research use and the delivery of computat
 * [x] Continuous spatial visualization
 * [ ] Xenium workflows
 * [ ] CosMX workflows
-* [ ] Spatial domains
+* [X] Spatial domains
 * [ ] Spatially variable genes
 
 #### High-resolution
