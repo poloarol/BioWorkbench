@@ -323,7 +323,7 @@ The same architecture can support both research use and the delivery of computat
 * [x] Custom annotations
 * [x] Gene expression visualizer
 * [x] Gene-set / module-score visualization
-* [ ] Categorical domain visualization
+* [x] Categorical domain visualization
 * [ ] Expanded differential expression
 * [ ] Improved analysis provenance
 * [ ] Project-level configuration
