@@ -6,6 +6,7 @@ import streamlit as st
 from celltypist import models
 from matplotlib import pyplot as plt
 
+from src.clustering import run_clustering
 from src.plotting import plot_umap
 
 @st.cache_data

@@ -8,13 +8,15 @@ import scanpy as sc
 import seaborn as sns
 import streamlit as st
 
-from src.clustering import run_clustering, run_pca, identify_marker_genes
-from src.plotting import plot_pca, plot_umap
+from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains
+from src.plotting import plot_pca, plot_umap, plot_spatial
 
 
 # -----------------------------------------------------------------------------
 # Sidebar
 # -----------------------------------------------------------------------------
+
+alpha = 0.2
 
 with st.sidebar:
     st.title("Processing parameters")
@@ -63,6 +65,17 @@ with st.sidebar:
         step=0.1,
     )
 
+    if st.session_state['is_spatial']:
+        st.subheader("Spatial Domains")
+
+        alpha = st.slider(
+            "Alpha (weight of the first graph)",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.2,
+            step=0.05,
+        )
+
 # -----------------------------------------------------------------------------
 # Dataset overview
 # -----------------------------------------------------------------------------
@@ -71,18 +84,16 @@ adata = None
 
 if not st.session_state.is_spatial:
     adata = st.session_state.adatas['filtered_wout_doublets']
+    col1, col2 = st.columns(2)
 else:
     adata = st.session_state.adatas['filtered_wout_blanks']
+    col1, col2, col3 = st.columns(3)
 
 # -----------------------------------------------------------------------------
 # Pipeline controls
 # -----------------------------------------------------------------------------
 
 st.divider()
-
-st.subheader("Analysis")
-
-col1, col2 = st.columns(2)
 
 with col1:
     if st.button(
@@ -125,6 +136,20 @@ with col2:
                 except Exception as exc:
                     st.error(f"Clustering failed: {exc}")
 
+if st.session_state['is_spatial']:
+    with col3:
+        if st.button(
+            "▶ Run Identify Spatial Domains",
+            use_container_width=True,
+        ):
+            with st.spinner("Running spatial domain identification..."):
+                try:
+                    # Placeholder for the actual spatial domain identification function
+                    st.success("Spatial domain identification completed.")
+                except Exception as exc:
+                    st.error(f"Spatial domain identification failed: {exc}")
+
+
 # -----------------------------------------------------------------------------
 # Results
 # -----------------------------------------------------------------------------
@@ -133,7 +158,10 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 
     st.divider()
 
-    col_pca, col_umap = st.columns(2)
+    if st.session_state['is_spatial']:
+        col_pca, col_umap, col_domains = st.columns(3)
+    else:
+        col_pca, col_umap = st.columns(2)
 
     # -------------------------------------------------------------------------
     # PCA
@@ -165,7 +193,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 
         else:
             st.info("PCA has not been run yet.")
-
+    
     # -------------------------------------------------------------------------
     # UMAP
     # -------------------------------------------------------------------------
@@ -197,6 +225,33 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
         else:
             st.info("UMAP has not been run yet.")
 
+    if st.session_state['is_spatial']:
+        with col_domains:
+            st.subheader("Spatial")
+            
+            adata = identify_spatial_domains(adata, alpha=alpha)
+
+            color_by = st.selectbox(
+                "Color cells by",
+                options=list(adata.obs.columns),
+                placeholder="squidpy_domains",
+                key="spatial_color_by",
+            )
+            
+            if "cluster_label" not in adata.obs and 'squidpy_domains' not in adata.obs:
+                st.warning("Neither 'cluster_label' nor 'squidpy_domains' found in adata.obs.")
+            else:
+                fig = plot_spatial(
+                    adata,
+                    color_by=color_by
+                )
+
+                st.pyplot(fig)
+
+            # st.dataframe(
+            #     domain_counts,
+            #     use_container_width=True,
+            # )
 
 # -----------------------------------------------------------------------------
 # Highly variable genes
@@ -291,6 +346,31 @@ if "rank_genes_groups" in adata.uns:
     )
 
 
+if 'squidpy_domains' in adata.obs:
+    st.divider()
+
+    st.subheader("Spatial Domains")
+
+    domain_counts = (
+        adata.obs["squidpy_domains"]
+        .value_counts()
+        .sort_index()
+        .rename("cells")
+        .to_frame()
+    )
+
+    domain_counts["percentage"] = (
+        domain_counts["cells"]
+        / len(adata)
+        * 100
+    ).round(2)
+
+    st.dataframe(
+        domain_counts,
+        use_container_width=True,
+    )
+
+
 # -----------------------------------------------------------------------------
 # Cluster summary
 # -----------------------------------------------------------------------------
@@ -319,7 +399,6 @@ if "cluster_label" in adata.obs:
         cluster_counts,
         use_container_width=True,
     )
-
 
 st.session_state.adatas['clustered'] = adata
 

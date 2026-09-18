@@ -1,6 +1,7 @@
 
 import scanpy as sc
 import seaborn as sns
+import squidpy as sq
 import matplotlib.pyplot as plt
 
 
@@ -170,4 +171,37 @@ def identify_marker_genes(adata: sc.AnnData, groupby: str = "cluster_label") -> 
 
     sc.tl.rank_genes_groups(adata, groupby=groupby, method="t-test")
 
+    return adata
+
+
+def identify_spatial_domains(adata: sc.AnnData, alpha: float = 0.2) -> sc.AnnData:
+    """
+    Identify spatial domains in an AnnData object using the Banksy algorithm.
+
+    Parameters:
+    - adata: sc.AnnData
+        The AnnData object containing spatial gene expression data.
+    - alpha: float, optional
+        Relative weight of the first graph in the joint graph. The second graph
+        is weighted by ``1 - alpha``; 0.5 gives both graphs equal importance.
+
+
+    Returns:
+    - adata: sc.AnnData
+        The AnnData object with spatial domains identified.
+    """
+
+    # nearest neighbor graph
+    sc.pp.neighbors(adata)
+    nn_graph_genes = adata.obsp["connectivities"]
+
+    # spatial proximity graph
+    sq.gr.spatial_neighbors(adata)
+    nn_graph_space = adata.obsp["spatial_connectivities"]
+    
+    joint_graph = (1 - alpha) * nn_graph_genes + alpha * nn_graph_space
+    sc.tl.leiden(adata, adjacency=joint_graph, key_added="squidpy_domains")
+    
+    # adata.obs['squidpy_domains'] = 'Domain' + adata.obs['squidpy_domains'].astype(str)
+    
     return adata

@@ -1,6 +1,10 @@
 /data
 /env
+/env_old
 *.pyc
+
+.dockerignore
+Dockerfile
 
 .streamlit/secrets.toml
 
