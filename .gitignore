@@ -3,9 +3,6 @@
 /env_old
 *.pyc
 
-.dockerignore
-Dockerfile
-
 .streamlit/secrets.toml
 
 src/__pycache__/**/*

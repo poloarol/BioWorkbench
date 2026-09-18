@@ -7,6 +7,9 @@ from src.utils import calculate_module_score
 from src.plotting import plot_umap, plot_spatial
 
 
+if 'module_score' not in st.session_state:
+    st.session_state['module_score'] = []
+
 adata = st.session_state.adatas['annotated']
     
 st.sidebar.subheader("Genes")
@@ -21,7 +24,6 @@ gene_search = st.sidebar.text_input(
      placeholder="e.g. GFAP, EGFR...",
 )
 
-all_modules = []
 
 if gene_search:
     genes_to_display = [
@@ -53,7 +55,7 @@ if st.sidebar.button("Submit Gene Set"):
             score_name=f"module_{module_name}",
         )
 
-all_modules.append(f"module_{module_name}")
+        st.session_state['module_score'].append(f"module_{module_name}")
 
 st.subheader("Module Scores Visualizer")
 
@@ -90,7 +92,7 @@ else:
     
     color_by = st.selectbox(
             "Module Score",
-            options=all_modules,
+            options=st.session_state['module_score'],
             key="module_color",
             placeholder="Select a module score"
         )

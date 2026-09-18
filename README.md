@@ -356,7 +356,7 @@ The same architecture can support both research use and the delivery of computat
 
 ## Development
 
-Clone the repository and create a Python environment:
+1. Clone the repository and create a Python environment:
 
 ```bash
 git clone https://github.com/poloarol/BioWorkbench.git
@@ -370,7 +370,25 @@ Activate the environment and install the project dependencies.
 Then launch the application with:
 
 ```bash
-streamlit run app.py
+streamlit run app.py --server.maxUploadSize=500
+```
+
+2. Build docker container from scratch
+
+```bash
+docker build -t bioworkbench .
+```
+
+The launch the application with
+
+```bash
+docker run -p 8501:8501 bioworkbench --server.maxUploadSize=500
+```
+
+3. Download docker container form DockerHub
+
+```bash
+coming soon ...
 ```
 
 ## Project Status
