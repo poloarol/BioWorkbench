@@ -417,6 +417,100 @@ def plot_umap(
     return fig
 
 
+def plot_umap_genes(
+    adata,
+    genes,
+    figsize=(8, 6),
+):
+    """Plot UMAP expression of multiple genes.
+
+    Args:
+        adata (sc.AnnData): Annotated data matrix containing UMAP
+            coordinates in `adata.obsm["X_umap"]`.
+        genes (list[str]): List of gene names to plot.
+        figsize (tuple, optional): Base figure size. Defaults to (8, 6).
+
+    Returns:
+        matplotlib.figure.Figure: The resulting figure.
+    """
+
+    if isinstance(genes, str):
+        genes = [genes]
+
+    if len(genes) == 0:
+        raise ValueError("No genes were provided for UMAP plotting.")
+
+    # Validate UMAP coordinates
+    if "X_umap" not in adata.obsm:
+        raise ValueError(
+            "UMAP coordinates not found in adata.obsm['X_umap']."
+        )
+
+    # Validate genes
+    missing_genes = [
+        gene for gene in genes
+        if gene not in adata.var_names
+    ]
+
+    if missing_genes:
+        raise ValueError(
+            f"Gene(s) not found in adata.var_names: {missing_genes}"
+        )
+
+    umap = adata.obsm["X_umap"]
+
+    n_genes = len(genes)
+
+    fig, axes = plt.subplots(
+        1,
+        n_genes,
+        figsize=(figsize[0] * n_genes, figsize[1]),
+        squeeze=False,
+    )
+
+    axes = axes[0]
+
+    for ax, gene in zip(axes, genes):
+
+        # Extract expression
+        values = np.log1p(adata[:, gene].X)
+
+        # Handle sparse matrices
+        if hasattr(values, "toarray"):
+            values = values.toarray()
+
+        values = np.asarray(values).flatten()
+
+        # Plot
+        scatter = ax.scatter(
+            umap[:, 0],
+            umap[:, 1],
+            c=values,
+            s=1,
+            alpha=0.7,
+            cmap="viridis",
+        )
+
+        fig.colorbar(
+            scatter,
+            ax=ax,
+            fraction=0.046,
+            pad=0.04,
+            label="Expression (log1p)",
+        )
+
+        ax.set_xlabel("UMAP 1")
+        ax.set_ylabel("UMAP 2")
+        ax.set_title(f"UMAP — {gene}")
+
+        ax.set_aspect("equal", adjustable="box")
+        ax.margins(0.02)
+
+    fig.tight_layout()
+
+    return fig
+
+
 def plot_spatial_genes(
     adata,
     genes,

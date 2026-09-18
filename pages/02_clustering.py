@@ -93,7 +93,6 @@ else:
 # Pipeline controls
 # -----------------------------------------------------------------------------
 
-st.divider()
 
 with col1:
     if st.button(

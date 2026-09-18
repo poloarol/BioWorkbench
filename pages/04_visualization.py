@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from src.utils import calculate_module_score
-from src.plotting import plot_umap, plot_spatial
+from src.plotting import plot_umap, plot_spatial, plot_spatial_genes, plot_umap_genes
 
 
 if 'module_score' not in st.session_state:
@@ -56,6 +56,48 @@ if st.sidebar.button("Submit Gene Set"):
         )
 
         st.session_state['module_score'].append(f"module_{module_name}")
+        
+st.subheader("Gene Expression Visualizer")
+
+color_by = st.selectbox(
+                "Select Gene...",
+                options=genes,
+                key="gene_exp"
+            )
+
+if st.session_state['is_spatial']:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.pyplot(
+            plot_umap_genes(
+                adata,
+                genes=color_by,
+                figsize=(12, 10),
+            )
+        )
+    with col2:
+        st.pyplot(
+            plot_spatial_genes(
+                adata,
+                genes=color_by,
+                figsize=(12, 10),
+            )
+        )
+    
+else:
+    col1 = st.columns(1)[0]
+    
+    with col1:
+        st.pyplot(
+            plot_umap_genes(
+                adata,
+                genes=color_by,
+                figsize=(12, 10),
+            )
+        )
+
+st.divider()
 
 st.subheader("Module Scores Visualizer")
 
