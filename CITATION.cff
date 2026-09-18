@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use BioWorkbench in your research, please cite it using the metadata below."
+type: software
+
+title: "BioWorkbench"
+abstract: "A modular computational framework for single-cell and spatial transcriptomics analysis."
+
+authors:
+  - family-names: "Wambo"
+    given-names: "Paul"
+
+version: "0.1.0"
+date-released: "2026-09-18"
+
+license: "GPL-3.0-or-later"
+
+repository-code: "https://github.com/poloarol/BioWorkbench"
+
+keywords:
+  - "single-cell RNA sequencing"
+  - "spatial transcriptomics"
+  - "bioinformatics"
+  - "computational biology"
+  - "scientific software"
+  - "single-cell genomics"
+
+url: "https://github.com/poloarol/BioWorkbench"
