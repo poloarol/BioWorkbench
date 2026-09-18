@@ -389,6 +389,37 @@ Development is centered around:
 
 The long-term goal is to provide an interactive workbench that can sit on top of validated computational analyses and make their results easier for researchers, collaborators, and clients to explore.
 
+## License
+
+BioWorkbench is free and open-source software released under the
+GNU General Public License, version 3 or any later version
+(GPL-3.0-or-later).
+
+Copyright © 2026 Paul Wambo.
+
+You are free to use, study, modify, and redistribute BioWorkbench
+under the terms of the GNU GPL. If you distribute BioWorkbench or
+a modified version of it, you must comply with the applicable
+requirements of the GPL, including providing recipients with the
+corresponding source code and preserving the applicable copyright
+and license notices.
+
+BioWorkbench is provided WITHOUT WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the `LICENSE` file for the complete terms and conditions.
+
+For the full license text, see [LICENSE](LICENSE).
+
+## Citation
+
+If you use BioWorkbench in academic research, publications,
+presentations, or other scholarly work, please cite the software
+using the information provided in [`CITATION.cff`](CITATION.cff).
+
+Citation information will be updated as BioWorkbench develops and
+as associated publications and persistent software identifiers
+become available.
+
 ## Author
 
 **Paul A. Wambo**
