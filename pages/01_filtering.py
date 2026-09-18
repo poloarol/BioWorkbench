@@ -531,6 +531,11 @@ if selected == "Top Gene":
             use_container_width=True,
         )
 
+    st.subheader("Highly Variable Genes")
+    st.markdown(
+        "The following plots show the top highly variable genes for each dataset subset."
+    )
+
     try:
         fig_one = highest_expressed_genes(
             base_adata,
@@ -548,7 +553,7 @@ if selected == "Top Gene":
         )
 
         cols = st.columns(3)
-
+        
         with cols[0]:
             st.subheader("Subset / Raw")
             st.pyplot(fig_one, use_container_width=True)

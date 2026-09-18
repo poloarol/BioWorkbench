@@ -7,7 +7,7 @@ from celltypist import models
 from matplotlib import pyplot as plt
 
 from src.clustering import run_clustering
-from src.plotting import plot_umap
+from src.plotting import plot_umap, plot_spatial
 
 @st.cache_data
 def get_celltypist_models():
@@ -143,22 +143,18 @@ available_annotations = [
 if "X_umap" in adata.obsm and available_annotations:
 
     st.divider()
+    st.subheader("Annotation Visualizations")
 
-    st.subheader("Annotation UMAPs")
+    for color_by in available_annotations:
 
-    # Display two plots per row
-    for i in range(0, len(available_annotations), 2):
+        st.caption(color_by)
 
-        columns = available_annotations[i:i + 2]
+        if st.session_state["is_spatial"]:
 
-        plot_cols = st.columns(2)
+            # UMAP + spatial
+            plot_cols = st.columns(2)
 
-        for plot_col, color_by in zip(plot_cols, columns):
-
-            with plot_col:
-
-                st.caption(color_by)
-
+            with plot_cols[0]:
                 fig = plot_umap(
                     adata,
                     color_by=color_by,
@@ -171,5 +167,32 @@ if "X_umap" in adata.obsm and available_annotations:
 
                 plt.close(fig)
 
+            with plot_cols[1]:
+                fig = plot_spatial(
+                    adata,
+                    color_by=color_by,
+                )
+
+                st.pyplot(
+                    fig,
+                    use_container_width=True,
+                )
+
+                plt.close(fig)
+
+        else:
+
+            # UMAP only
+            fig = plot_umap(
+                adata,
+                color_by=color_by,
+            )
+
+            st.pyplot(
+                fig,
+                use_container_width=True,
+            )
+
+            plt.close(fig)
 
 st.session_state.adatas['annotated'] = adata

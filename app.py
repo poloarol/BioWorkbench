@@ -19,8 +19,8 @@ app_header()
 pages = [
     st.Page("pages/01_filtering.py", title="01 - Cell and Gene Filtering"),
     st.Page("pages/02_clustering.py", title="02 - Exploratory Analysis & Clustering"),
-    st.Page("pages/03_annotation.py", title="03 - Annotation"),
-    st.Page("pages/04_visualization.py", title="04 - Visualizer"),
+    st.Page("pages/03_annotation.py", title="03 - Celltype Annotation"),
+    st.Page("pages/04_visualization.py", title="04 - Gene & Module Visualizer"),
     st.Page("pages/05_download.py", title="05 - Download")
 ]
 

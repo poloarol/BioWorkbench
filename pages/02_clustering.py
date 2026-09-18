@@ -69,7 +69,7 @@ with st.sidebar:
         st.subheader("Spatial Domains")
 
         alpha = st.slider(
-            "Alpha (weight of the first graph)",
+            "Alpha (weight of the nearest neighbor graph)",
             min_value=0.0,
             max_value=1.0,
             value=0.2,
@@ -145,6 +145,7 @@ if st.session_state['is_spatial']:
             with st.spinner("Running spatial domain identification..."):
                 try:
                     # Placeholder for the actual spatial domain identification function
+                    adata = identify_spatial_domains(adata, alpha=alpha)
                     st.success("Spatial domain identification completed.")
                 except Exception as exc:
                     st.error(f"Spatial domain identification failed: {exc}")
@@ -227,20 +228,18 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 
     if st.session_state['is_spatial']:
         with col_domains:
-            st.subheader("Spatial")
             
-            adata = identify_spatial_domains(adata, alpha=alpha)
-
-            color_by = st.selectbox(
-                "Color cells by",
-                options=list(adata.obs.columns),
-                placeholder="squidpy_domains",
-                key="spatial_color_by",
-            )
-            
-            if "cluster_label" not in adata.obs and 'squidpy_domains' not in adata.obs:
-                st.warning("Neither 'cluster_label' nor 'squidpy_domains' found in adata.obs.")
+            if "squidpy_domains" not in adata.obs:
+                st.info("Run UMAP Clustering and Spatial Domain analysis first.")
             else:
+                st.subheader("Spatial")
+                color_by = st.selectbox(
+                    "Color cells by",
+                    options=list(adata.obs.columns),
+                    placeholder="squidpy_domains",
+                    key="spatial_color_by",
+                )
+            
                 fig = plot_spatial(
                     adata,
                     color_by=color_by
