@@ -11,13 +11,14 @@ import streamlit as st
 
 from plotly.subplots import make_subplots
 
-from src.utils import load_data
+from src.utils import load_data, get_spatially_variable_genes
 from src.filtering import data_filtering
 from src.plotting import (
     highest_expressed_genes,
     plot_qc_metrics,
     qc_summary,
-    plot_spatial
+    plot_spatial,
+    plot_spatial_genes
 )
 
 
@@ -530,44 +531,89 @@ if selected == "Top Gene":
             fig,
             use_container_width=True,
         )
-
-    st.subheader("Highly Variable Genes")
-    st.markdown(
-        "The following plots show the top highly variable genes for each dataset subset."
-    )
-
-    try:
-        fig_one = highest_expressed_genes(
-            base_adata,
-            n_top_genes=10,
+    
+    if st.session_state['is_spatial']:
+        st.subheader("Spatially Variable Genes")
+        st.markdown(
+            "The following lists show the top spatially variable genes for each dataset subset."
         )
-
-        fig_two = highest_expressed_genes(
-            filtered_adata,
-            n_top_genes=10,
-        )
-
-        fig_three = highest_expressed_genes(
-            singlet_adata,
-            n_top_genes=10,
-        )
-
-        cols = st.columns(3)
         
-        with cols[0]:
+        gene_set1 = get_spatially_variable_genes(base_adata, n_top_genes=10)
+        gene_set2 = get_spatially_variable_genes(filtered_adata, n_top_genes=10)
+        gene_set3 = get_spatially_variable_genes(singlet_adata, n_top_genes=10)
+
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
             st.subheader("Subset / Raw")
-            st.pyplot(fig_one, use_container_width=True)
+            color_by = st.selectbox(
+                "Module Score",
+                options=gene_set1,
+                key="svg1",
+                placeholder="Select a Spatially Variable Gene"
+            )
+            
+            st.pyplot(plot_spatial_genes(base_adata, genes=[color_by]), use_container_width=True)
 
-        with cols[1]:
-            st.subheader(f"Filtered with {ttl}s")
-            st.pyplot(fig_two, use_container_width=True)
+        with col2:
+            st.subheader("Filtered with Blanks")
+            color_by = st.selectbox(
+                "Module Score",
+                options=gene_set2,
+                key="svg2",
+                placeholder="Select a Spatially Variable Gene"
+            )
+            st.pyplot(plot_spatial_genes(filtered_adata, genes=[color_by]), use_container_width=True)
 
-        with cols[2]:
-            st.subheader(f"Filtered without {ttl}s")
-            st.pyplot(fig_three, use_container_width=True)
+        with col3:
+            st.subheader("Filtered without Blanks")
+            color_by = st.selectbox(
+                "Module Score",
+                options=gene_set3,
+                key="svg3",
+                placeholder="Select a Spatially Variable Gene"
+            )
+            st.pyplot(plot_spatial_genes(singlet_adata, genes=[color_by]), use_container_width=True)
 
-    except Exception as e:
-        st.error(f"Unable to generate gene plots: {e}")
+    else:
+        
+        st.subheader("Highly Variable Genes")
+        st.markdown(
+            "The following plots show the top highly variable genes for each dataset subset."
+        )
+        
+        try:
+            fig_one = highest_expressed_genes(
+                base_adata,
+                n_top_genes=10,
+            )
+
+            fig_two = highest_expressed_genes(
+                filtered_adata,
+                n_top_genes=10,
+            )
+
+            fig_three = highest_expressed_genes(
+                singlet_adata,
+                n_top_genes=10,
+            )
+
+            cols = st.columns(3)
+            
+            with cols[0]:
+                st.subheader("Subset / Raw")
+                st.pyplot(fig_one, use_container_width=True)
+
+            with cols[1]:
+                st.subheader(f"Filtered with {ttl}s")
+                st.pyplot(fig_two, use_container_width=True)
+
+            with cols[2]:
+                st.subheader(f"Filtered without {ttl}s")
+                st.pyplot(fig_three, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Unable to generate gene plots: {e}")
 
 
 # ============================================================

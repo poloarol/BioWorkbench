@@ -145,3 +145,32 @@ def calculate_module_score(
     )
 
     return adata
+
+
+def get_spatially_variable_genes(adata: sc.AnnData, n_top_genes: int = 2000) -> list[str]:
+    """
+    Identify spatially variable genes in an AnnData object.
+
+    Parameters:
+    - adata: sc.AnnData
+        The AnnData object containing the gene expression data.
+    - n_top_genes: int, optional (default=2000)
+        The number of top spatially variable genes to return.
+
+    Returns:
+    - list[str]
+        A list of the top spatially variable genes.
+    """
+    sc.pp.highly_variable_genes(
+        adata,
+        flavor="seurat_v3",
+        n_top_genes=n_top_genes,
+        subset=False,
+        inplace=True,
+    )
+    
+    items = adata.var_names[adata.var["highly_variable"]].tolist()
+    items = [x for x in items if "Blank-" not in x]
+
+    
+    return items

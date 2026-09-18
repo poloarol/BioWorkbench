@@ -1,4 +1,4 @@
-
+import numpy as np
 import pandas as pd
 import scanpy as sc
 import seaborn as sns
@@ -411,6 +411,103 @@ def plot_umap(
     ax.set_xlabel("UMAP1")
     ax.set_ylabel("UMAP2")
     ax.set_title(f"UMAP — {color_by.replace('_', ' ').title()}")
+
+    fig.tight_layout()
+
+    return fig
+
+
+def plot_spatial_genes(
+    adata,
+    genes,
+    figsize=(8, 6),
+):
+    """Plot spatial expression of multiple genes.
+
+    Args:
+        adata (sc.AnnData): Annotated data matrix containing spatial
+            coordinates in `adata.obs["center_x"]` and
+            `adata.obs["center_y"]`.
+        genes (list[str]): List of gene names to plot.
+        figsize (tuple, optional): Base figure size. Defaults to (8, 6).
+
+    Returns:
+        matplotlib.figure.Figure: The resulting figure.
+    """
+
+    if isinstance(genes, str):
+        genes = [genes]
+
+    # Validate spatial coordinates
+    required_coordinates = {"center_x", "center_y"}
+
+    missing_coordinates = required_coordinates - set(adata.obs.columns)
+
+    if missing_coordinates:
+        raise ValueError(
+            "Missing required spatial coordinate columns: "
+            f"{sorted(missing_coordinates)}"
+        )
+
+    # Validate genes
+    missing_genes = [gene for gene in genes if gene not in adata.var_names]
+
+    if missing_genes:
+        raise ValueError(
+            f"Gene(s) not found in adata.var_names: {missing_genes}"
+        )
+
+    n_genes = len(genes)
+
+    if n_genes == 0:
+        raise ValueError("No genes were provided for spatial plotting.")
+
+    fig, axes = plt.subplots(
+        1,
+        n_genes,
+        figsize=(figsize[0] * n_genes, figsize[1]),
+        squeeze=False,
+    )
+
+    axes = axes[0]
+
+    for ax, gene in zip(axes, genes):
+
+        # Extract expression values
+        values = np.log1p(adata[:, gene].X)
+
+        # Convert sparse matrix / 2D array to 1D numpy array
+        if hasattr(values, "toarray"):
+            values = values.toarray()
+
+        values = np.asarray(values).flatten()
+
+        scatter = ax.scatter(
+            adata.obs["center_x"],
+            -adata.obs["center_y"],
+            c=values,
+            s=1,
+            alpha=0.7,
+            cmap="viridis",
+        )
+
+        fig.colorbar(
+            scatter,
+            ax=ax,
+            fraction=0.046,
+            pad=0.04,
+            label="Expression (log1p)",
+        )
+
+        ax.set_xlabel("Spatial X")
+        ax.set_ylabel("Spatial Y")
+        ax.set_title(
+            f"Spatial — {gene}"
+        )
+
+        ax.set_aspect("equal", adjustable="box")
+        ax.margins(0)
+        ax.axis("off")
 
     fig.tight_layout()
 
