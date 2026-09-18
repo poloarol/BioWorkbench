@@ -359,8 +359,6 @@ Configuration defaults are maintained separately in `config/`.
 * [ ] Segmentation overlays
 * [ ] Transcript-level visualization
 * [ ] Spatially variable gene analysis
-* [ ] Neighborhood analysis
-* [ ] Cell-cell interaction analysis
 * [ ] Additional export functionality
 
 ---
