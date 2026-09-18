@@ -342,6 +342,7 @@ Configuration defaults are maintained separately in `config/`.
 * [x] Spatial annotation visualization
 * [x] Spatial-domain identification
 * [x] Spatially variable gene analysis
+* [x] Transcript-level visualization
 
 ### In development
 
@@ -358,7 +359,6 @@ Configuration defaults are maintained separately in `config/`.
 * [ ] Visium HD support
 * [ ] Tissue image overlays
 * [ ] Segmentation overlays
-* [ ] Transcript-level visualization
 * [ ] Additional export functionality
 
 ---
