@@ -8,41 +8,61 @@ import scanpy as sc
 
 np.random.seed(42) 
 
+import numpy as np
+import anndata as ad
+import pytest
+
+
 @pytest.fixture
-def single_cell_adata():
-    """Small synthetic single-cell AnnData object for testing."""
+def small_adata():
+    X = np.array([
+        [10, 0, 0, 5, 0],
+        [8,  0, 1, 4, 0],
+        [0,  9, 8, 0, 1],
+        [0, 10, 7, 0, 0],
+        [1,  0, 0, 1, 10],
+    ])
+
+    adata = ad.AnnData(X)
+
+    adata.var_names = [
+        "GeneA",
+        "GeneB",
+        "GeneC",
+        "GeneD",
+        "MT-GeneE",
+    ]
+
+    adata.obs_names = [
+        "Cell1",
+        "Cell2",
+        "Cell3",
+        "Cell4",
+        "Cell5",
+    ]
+    
+    adata.obs["pct_counts_mt"] = [5.0, 10.0, 25.0, 15.0, 30.0]
+
+    return adata
 
 
-    n_cells = 20
-    n_genes = 10
+@pytest.fixture
+def doublet_adata():
+    np.random.seed(42)
 
     X = np.random.poisson(
         lam=5,
-        size=(n_cells, n_genes),
+        size=(100, 50)
     )
 
     adata = sc.AnnData(X)
 
     adata.obs_names = [
-        f"cell_{i:03d}"
-        for i in range(n_cells)
+        f"Cell{i}" for i in range(100)
     ]
 
     adata.var_names = [
-        f"gene_{i:03d}"
-        for i in range(n_genes)
+        f"Gene{i}" for i in range(50)
     ]
-
-    adata.obs["n_genes_by_counts"] = (
-        np.count_nonzero(X, axis=1)
-    )
-
-    adata.obs["total_counts"] = X.sum(axis=1)
-
-    adata.obs["pct_counts_mt"] = np.random.uniform(
-        0,
-        10,
-        n_cells,
-    )
 
     return adata
