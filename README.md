@@ -342,6 +342,7 @@ Configuration defaults are maintained separately in `config/`.
 * [x] Spatial annotation visualization
 * [x] Spatial-domain identification
 * [x] Spatially variable gene analysis
+* [x] Transcript-level visualization
 
 ### In development
 
@@ -356,9 +357,9 @@ Configuration defaults are maintained separately in `config/`.
 * [ ] Xenium support
 * [ ] CosMX support
 * [ ] Visium HD support
+* [ ] Get information of gene(s) based on context - Agentic AI
 * [ ] Tissue image overlays
 * [ ] Segmentation overlays
-* [ ] Transcript-level visualization
 * [ ] Additional export functionality
 
 ---
