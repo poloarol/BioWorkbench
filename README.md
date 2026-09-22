@@ -356,6 +356,53 @@ Configuration values provide defaults for the interactive workflow and can be ad
 
 ---
 
+## 🧪 Beta Testing
+
+BioWorkbench is currently in **beta** and is being tested with real single-cell and spatial transcriptomics datasets.
+
+The current beta focuses on:
+
+* **Single-cell RNA-seq** analysis
+* **MERFISH** spatial transcriptomics
+* Quality control and filtering
+* Dimensionality reduction and clustering
+* Cell-type annotation with CellTypist
+* Gene and module-score visualization
+* Spatial visualization and exploration
+
+### Who is this for?
+
+BioWorkbench is primarily intended for computational biologists and researchers working with **AnnData-based single-cell or spatial transcriptomics data**.
+
+You do not need to be a BioWorkbench developer to participate. If you can work with `.h5ad` datasets and have experience with single-cell or spatial omics analysis, your feedback is particularly valuable.
+
+### What we're looking for
+
+Beta testers are encouraged to use BioWorkbench with their own datasets and report:
+
+* Bugs or unexpected behavior
+* Installation or environment problems
+* Confusing workflows or UI elements
+* Missing functionality
+* Visualization issues
+* Performance problems
+* Features that would make the analysis workflow more useful
+
+### How to report an issue
+
+Please open a [GitHub Issue](../../issues) and include, where possible:
+
+1. **What you were trying to do**
+2. **What you expected to happen**
+3. **What actually happened**
+4. **Steps to reproduce the problem**
+5. **Your operating system and installation method**
+6. **Any relevant error messages or screenshots**
+
+You do not need to determine whether something is technically a "bug" before reporting it. If something is confusing, unexpected, or difficult to use, that feedback is useful too.
+
+> **Beta status:** BioWorkbench is under active development. Interfaces, workflows, and supported functionality may change as feedback is incorporated.
+
 ## Installation
 
 Clone the repository:
