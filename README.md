@@ -1,4 +1,4 @@
-# 🧬 BioWorkbench
+![BioWorkbench logo](docs/images/bioworkbench-logo.png)
 
 BioWorkbench is a modular, interactive **single-cell and spatial transcriptomics analysis workbench** built with Python and Streamlit.
 
