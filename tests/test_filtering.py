@@ -252,3 +252,86 @@ def test_data_filtering_passes_results_between_steps(small_adata):
     mock_doublets.assert_called_once_with(filtered_mt, 0.05)
 
     assert result is filtered_doublets
+
+
+from unittest.mock import patch
+
+
+def test_data_filtering_non_spatial(small_adata):
+    with patch("src.filtering._filter_cells") as mock_cells, \
+         patch("src.filtering._filter_genes") as mock_genes, \
+         patch("src.filtering._filter_mitochondrial_genes") as mock_mt, \
+         patch("src.filtering._identify_doublets") as mock_doublets:
+
+        mock_cells.return_value = small_adata
+        mock_genes.return_value = small_adata
+        mock_mt.return_value = small_adata
+        mock_doublets.return_value = small_adata
+
+        result = data_filtering(
+            small_adata,
+            min_genes=100,
+            min_cells=5,
+            max_mt_percentage=15,
+            expected_doublet_rate=0.10,
+            is_spatial=False,
+        )
+
+    mock_cells.assert_called_once_with(small_adata, 100)
+    mock_genes.assert_called_once_with(small_adata, 5)
+    mock_mt.assert_called_once_with(small_adata, 15)
+    mock_doublets.assert_called_once_with(small_adata, 0.10)
+
+    assert result is small_adata
+
+
+def test_data_filtering_spatial(small_adata):
+    with patch("src.filtering._filter_cells") as mock_cells, \
+         patch("src.filtering._filter_genes") as mock_genes, \
+         patch("src.filtering._identify_blanks") as mock_blanks, \
+         patch("src.filtering._filter_mitochondrial_genes") as mock_mt, \
+         patch("src.filtering._identify_doublets") as mock_doublets:
+
+        mock_cells.return_value = small_adata
+        mock_genes.return_value = small_adata
+        mock_blanks.return_value = small_adata
+
+        result = data_filtering(
+            small_adata,
+            min_genes=100,
+            min_cells=5,
+            blank_max_percentage=8,
+            is_spatial=True,
+        )
+
+    mock_cells.assert_called_once_with(small_adata, 100)
+    mock_genes.assert_called_once_with(small_adata, 5)
+
+    mock_blanks.assert_called_once_with(
+        small_adata,
+        max_blank_percentage=8
+    )
+
+    mock_mt.assert_not_called()
+    mock_doublets.assert_not_called()
+
+    assert result is small_adata
+
+
+def test_data_filtering_defaults(small_adata):
+    with patch("src.filtering._filter_cells") as mock_cells, \
+         patch("src.filtering._filter_genes") as mock_genes, \
+         patch("src.filtering._filter_mitochondrial_genes") as mock_mt, \
+         patch("src.filtering._identify_doublets") as mock_doublets:
+
+        mock_cells.return_value = small_adata
+        mock_genes.return_value = small_adata
+        mock_mt.return_value = small_adata
+        mock_doublets.return_value = small_adata
+
+        data_filtering(small_adata)
+
+    mock_cells.assert_called_once_with(small_adata, 200)
+    mock_genes.assert_called_once_with(small_adata, 3)
+    mock_mt.assert_called_once_with(small_adata, 20)
+    mock_doublets.assert_called_once_with(small_adata, 0.05)
