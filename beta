@@ -1,0 +1,38 @@
+# BioWorkbench Beta
+
+BioWorkbench is currently in beta.
+
+## What to test
+
+- Loading an AnnData object
+- QC and filtering
+- Clustering
+- Cell-type annotation
+- UMAP visualization
+- MERFISH spatial visualization
+- Spatial domain identification
+- Export
+
+## Known limitations
+
+- MERFISH is the only supported spatial technology
+- ...
+- ...
+ 
+## Please report
+
+- Bugs
+- confusing UI
+- unexpected results
+- missing functionality
+- installation problems
+- performance problems
+
+## Reporting issues
+
+Please open a GitHub issue and include:
+- operating system
+- installation method
+- dataset characteristics
+- steps to reproduce
+- error message / screenshot
