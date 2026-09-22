@@ -409,6 +409,59 @@ Upload an `.h5ad` dataset through the application to begin the analysis workflow
 
 ---
 
+## Running with Docker
+
+BioWorkbench includes a `Dockerfile` for running the application in a containerized environment.
+
+Using Docker provides an alternative to installing the Python dependencies directly on the host system.
+
+### Build the Docker image
+
+From the repository root:
+
+```bash
+docker build -t bioworkbench .
+```
+
+### Run BioWorkbench
+
+Start the container with the Streamlit port exposed:
+
+```bash
+docker run --rm -p 8501:8501 bioworkbench
+```
+
+BioWorkbench should then be available at:
+
+```text
+http://localhost:8501
+```
+
+### Running with local data
+
+If you want to make files from your local machine available to the container, mount a directory when starting the container:
+
+```bash
+docker run --rm \
+  -p 8501:8501 \
+  -v /path/to/data:/data \
+  bioworkbench
+```
+
+The exact data path and workflow may depend on how the dataset is being supplied to the application.
+
+### Docker development
+
+The Docker image is intended to provide a reproducible environment containing the dependencies required to run BioWorkbench.
+
+For development and testing, you can continue to use a local Python virtual environment and run the test suite directly:
+
+```bash
+python -m pytest
+```
+
+Docker can then be used to verify that the application also runs successfully in its containerized environment.
+
 ## Testing
 
 BioWorkbench uses **pytest** for automated testing of its computational functionality.
@@ -538,19 +591,16 @@ BioWorkbench is under active development. The roadmap is divided into implemente
 
 #### Spatial Analysis
 
-* [ ] Spatially variable gene analysis
+* [x] Spatially variable gene analysis
 * [ ] Spatial marker analysis
-* [ ] Tissue-image overlays
-* [ ] Segmentation overlays
-* [ ] Transcript-level spatial visualization
+* [x] Transcript-level spatial visualization
 * [ ] Cell neighborhood analysis
-* [ ] Cell-cell interaction analysis
 
 #### Annotation
 
 * [ ] Spatially aware cell-type annotation
 * [ ] Multiple annotation models
-* [ ] Marker-based annotation
+* [x] Marker-based annotation
 * [ ] Interactive annotation editing
 * [ ] Annotation confidence and uncertainty visualization
 
@@ -561,7 +611,7 @@ BioWorkbench is under active development. The roadmap is divided into implemente
 
 #### Software Engineering
 
-* [ ] Containerized deployment
+* [x] Containerized deployment
 * [ ] Improved session-state management
 * [ ] Modular dataset abstractions
 * [ ] Reproducible analysis configurations
