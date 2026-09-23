@@ -468,18 +468,18 @@ From the repository root:
 docker build -t bioworkbench .
 ```
 
+BioWorkbench should then be available at:
+
+```text
+http://localhost:8501
+```
+
 ### Run BioWorkbench
 
 Start the container with the Streamlit port exposed:
 
 ```bash
 docker run --rm -p 8501:8501 bioworkbench
-```
-
-BioWorkbench should then be available at:
-
-```text
-http://localhost:8501
 ```
 
 ### Running with local data
