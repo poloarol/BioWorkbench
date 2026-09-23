@@ -1,8 +1,6 @@
 ![BioWorkbench logo](docs/images/bioworkbench-logo.png)
 
-BioWorkbench is a modular, interactive **single-cell and spatial transcriptomics analysis workbench** built with Python and Streamlit.
-
-It provides an interactive interface for common computational biology workflows while keeping the underlying analysis logic in reusable Python modules. The application is built around **AnnData** and the Scanpy ecosystem and is designed to support both exploratory analysis and reproducible computational workflows.
+BioWorkbench provides an interactive exploration layer for single-cell and spatial omics data, allowing researchers to rapidly inspect datasets, visualize patterns, explore annotations, and develop hypotheses before moving into more specialized or computationally intensive workflows. The application is built around **AnnData** and the Scanpy ecosystem and is designed to support both exploratory analysis and reproducible computational workflows.
 
 > 🚧 **Active development**
 >
