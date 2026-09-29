@@ -1,18 +1,44 @@
+import base64
+
 import streamlit as st
+from pathlib import Path
+
 
 st.set_page_config(
     page_title="BioWorkbench",
-    page_icon="🧬",
-    layout="wide"
+    page_icon="docs/images/bioworkbench-logo-small.png",
+    # layout="wide"
 )
 
 def app_header():
-    st.markdown("""
-        <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">
-            BioWorkbench - A lightweight single-cell genomics analysis platform
-           </h1>
+    logo_path = Path(__file__).parent / "docs" / "images" / "bioworkbench-logo.png"
+
+    with open(logo_path, "rb") as f:
+        logo_base64 = base64.b64encode(f.read()).decode()
+
+    st.markdown(
+        f"""
+        <div style="
+            width: 100%;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        ">
+            <img
+                src="data:image/png;base64,{logo_base64}"
+                style="
+                    width: 90%;
+                    max-height: 210px;
+                    object-fit: contain;
+                "
+            >
+        </div>
         """,
-        unsafe_allow_html=True,)
+        unsafe_allow_html=True,
+    )
 
 app_header()
 
