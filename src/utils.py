@@ -57,6 +57,58 @@ def load_data(filepath: str,
     
     return {'raw': adata, 'subset': sdata}
 
+# def load_data(
+#     filepath: str,
+#     cell_columns: list[str] | None = None,
+#     genes: list[str] | None = None,
+#     is_spatial: bool = False,
+# ) -> dict[str, sc.AnnData | None]:
+#     """
+#     Load an AnnData dataset and optionally create an in-memory subset.
+
+#     Returns
+#     -------
+#     dict
+#         {
+#             "raw": original AnnData,
+#             "subset": selected AnnData or None
+#         }
+#     """
+
+#     # Use backed mode for the original dataset
+#     adata = sc.read(
+#         filepath,
+#         backed="r",
+#     )
+
+#     subset = None
+
+#     # Create subset only when requested
+#     if cell_columns is not None or genes is not None:
+
+#         obs_indices = cell_columns if cell_columns is not None else slice(None)
+#         var_indices = genes if genes is not None else slice(None)
+
+#         subset = adata[obs_indices, var_indices].copy()
+
+#         _prepare_adata(
+#             subset,
+#             is_spatial=is_spatial,
+#         )
+
+#     else:
+#         # If no subset was requested, prepare the loaded dataset
+#         # only if you actually want to modify the raw object.
+#         _prepare_adata(
+#             adata,
+#             is_spatial=is_spatial,
+#         )
+
+#     return {
+#         "raw": adata,
+#         "subset": subset,
+#     }
+
 
 def _calculate_qc_metrics(adata, is_spatial=False):
     """
@@ -174,3 +226,46 @@ def get_spatially_variable_genes(adata: sc.AnnData, n_top_genes: int = 2000) -> 
 
     
     return items
+
+
+# def _prepare_adata(
+#     adata: sc.AnnData,
+#     is_spatial: bool = False,
+# ) -> sc.AnnData:
+
+#     _calculate_qc_metrics(
+#         adata,
+#         is_spatial=is_spatial,
+#     )
+
+#     adata.layers["raw"] = adata.X.copy()
+
+#     if is_spatial:
+
+#         # Blank genes
+#         blank_genes = adata.var_names[
+#             adata.var_names.str.startswith("Blank-")
+#         ].tolist()
+
+#         if blank_genes:
+#             blank_counts = np.asarray(
+#                 adata[:, blank_genes].X.sum(axis=1)
+#             ).ravel()
+
+#             adata.obs["blank_counts"] = blank_counts
+
+#             adata.obs["pct_counts_blank"] = (
+#                 adata.obs["blank_counts"]
+#                 / adata.obs["total_counts"]
+#             ) * 100
+#         else:
+#             adata.obs["blank_counts"] = 0
+#             adata.obs["pct_counts_blank"] = 0.0
+
+#         # Spatial coordinates
+#         if {"center_x", "center_y"}.issubset(adata.obs.columns):
+#             adata.obsm["spatial"] = adata.obs[
+#                 ["center_x", "center_y"]
+#             ].to_numpy()
+
+#     return adata

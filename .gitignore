@@ -6,3 +6,5 @@
 .streamlit/secrets.toml
 
 src/__pycache__/**/*
+
+/.pytest_cache

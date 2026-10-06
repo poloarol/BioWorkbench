@@ -1,11 +1,7 @@
-import io
-import os
-import tempfile
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import scanpy as sc
-import seaborn as sns
 import streamlit as st
 
 from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains
@@ -399,82 +395,3 @@ if "cluster_label" in adata.obs:
     )
 
 st.session_state.adatas['clustered'] = adata
-
-# # -----------------------------------------------------------------------------
-# # Download
-# # -----------------------------------------------------------------------------
-
-# st.divider()
-
-# st.subheader("Export")
-
-# download_col1, download_col2 = st.columns(2)
-
-
-# # -----------------------------------------------------------------------------
-# # Download processed AnnData
-# # -----------------------------------------------------------------------------
-
-# with download_col1:
-
-#     with tempfile.NamedTemporaryFile(
-#         suffix=".h5ad",
-#         delete=False,
-#     ) as tmp:
-#         tmp_path = tmp.name
-
-#     try:
-#         adata.write_h5ad(tmp_path)
-
-#         with open(tmp_path, "rb") as f:
-#             h5ad_data = f.read()
-
-#         st.download_button(
-#             label="⬇ Download processed AnnData",
-#             data=h5ad_data,
-#             file_name="processed.h5ad",
-#             mime="application/octet-stream",
-#             use_container_width=True,
-#         )
-
-#     finally:
-#         if os.path.exists(tmp_path):
-#             os.remove(tmp_path)
-
-
-# # -----------------------------------------------------------------------------
-# # Download marker genes
-# # -----------------------------------------------------------------------------
-
-# with download_col2:
-
-#     if "rank_genes_groups" in adata.uns:
-
-#         marker_df = sc.get.rank_genes_groups_df(
-#             adata,
-#             group=None,
-#         )
-
-#         marker_csv = marker_df.to_csv(
-#             index=False
-#         ).encode("utf-8")
-
-#         st.download_button(
-#             label="⬇ Download marker genes",
-#             data=marker_csv,
-#             file_name="marker_genes.csv",
-#             mime="text/csv",
-#             use_container_width=True,
-#         )
-
-#     else:
-
-#         st.button(
-#             "⬇ Download marker genes",
-#             disabled=True,
-#             use_container_width=True,
-#         )
-
-#         st.caption(
-#             "Run marker-gene analysis first."
-#         )

@@ -3,10 +3,7 @@ import yaml
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import pandas as pd
 import plotly.graph_objects as go
-import seaborn as sns
 import streamlit as st
 
 from plotly.subplots import make_subplots
@@ -29,7 +26,7 @@ from src.plotting import (
 CONFIG_PATH = Path(__file__).parents[1] / "config" / "params.yaml"
 
 if "adatas" not in st.session_state:
-    st.session_state.adatas = None
+    st.session_state.adatas = {}
 
 if "filtered" not in st.session_state:
     st.session_state.filtered = False
@@ -52,21 +49,13 @@ if 'is_spatial' not in st.session_state:
 # ============================================================
 
 def get_base_adata():
-    """
-    Return the subset AnnData if it exists, otherwise raw AnnData.
-
-    Returns None if no usable AnnData object is loaded.
-    """
+    """ Return the raw AnnData object if available, otherwise None. """
     adatas = st.session_state.get("adatas")
 
     if not isinstance(adatas, dict):
         return None
 
-    # subset = adatas.get("subset")
     raw = adatas.get("raw")
-
-    # if subset is not None:
-    #     return subset
 
     if raw is not None:
         return raw
@@ -152,17 +141,17 @@ with st.sidebar:
         max_upload_size = 500
     )
 
-    cells_file = st.file_uploader(
-        "Upload your cells CSV file",
-        type=["csv"],
-        key="cells_uploader",
-    )
+    # cells_file = st.file_uploader(
+    #     "Upload your cells CSV file",
+    #     type=["csv"],
+    #     key="cells_uploader",
+    # )
 
-    genes_file = st.file_uploader(
-        "Upload your genes CSV file",
-        type=["csv"],
-        key="genes_uploader",
-    )
+    # genes_file = st.file_uploader(
+    #     "Upload your genes CSV file",
+    #     type=["csv"],
+    #     key="genes_uploader",
+    # )
 
     # --------------------------------------------------------
     # Load uploaded files
@@ -189,12 +178,13 @@ with st.sidebar:
                         "Expected a dictionary containing AnnData objects."
                     )
                 else:
-                    st.session_state.adatas = loaded_adatas
+                    print(loaded_adatas)
+                    st.session_state.adatas['raw'] = loaded_adatas['raw']
                     st.session_state.uploaded_adata_name = adata_file.name
                     st.session_state.filtered = False
 
             except Exception as e:
-                st.session_state.adatas = None
+                st.session_state.adatas['raw'] = None
                 st.session_state.uploaded_adata_name = None
                 st.session_state.filtered = False
                 
@@ -206,19 +196,19 @@ with st.sidebar:
                 )
                 st.code(traceback.format_exc())
 
-    if cells_file is not None:
-        try:
-            st.session_state.cells = pd.read_csv(cells_file)
-        except Exception as e:
-            st.error(f"Error reading cells CSV: {e}")
-            st.session_state.cells = None
+    # if cells_file is not None:
+    #     try:
+    #         st.session_state.cells = pd.read_csv(cells_file)
+    #     except Exception as e:
+    #         st.error(f"Error reading cells CSV: {e}")
+    #         st.session_state.cells = None
 
-    if genes_file is not None:
-        try:
-            st.session_state.genes = pd.read_csv(genes_file)
-        except Exception as e:
-            st.error(f"Error reading genes CSV: {e}")
-            st.session_state.genes = None
+    # if genes_file is not None:
+    #     try:
+    #         st.session_state.genes = pd.read_csv(genes_file)
+    #     except Exception as e:
+    #         st.error(f"Error reading genes CSV: {e}")
+    #         st.session_state.genes = None
 
     # --------------------------------------------------------
     # Filter controls
@@ -1104,3 +1094,11 @@ elif selected == "Statistics":
                 st.error(
                     f"Unable to calculate summary: {e}"
                 )
+
+st.session_state.params = {
+    "min_genes": min_genes,
+    "min_cells": min_cells,
+    "blank_threshold": blank_threshold,
+    "max_mt_percentage": max_mt_percentage,
+    "exp_doublet_rate": exp_doublet_rate
+}

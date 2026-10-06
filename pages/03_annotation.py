@@ -139,7 +139,6 @@ available_annotations = [
     if column in adata.obs.columns
 ]
 
-
 if "X_umap" in adata.obsm and available_annotations:
 
     st.divider()
@@ -147,11 +146,10 @@ if "X_umap" in adata.obsm and available_annotations:
 
     for color_by in available_annotations:
 
-        st.caption(color_by)
+        st.markdown(f"### {color_by}")
 
         if st.session_state["is_spatial"]:
 
-            # UMAP + spatial
             plot_cols = st.columns(2)
 
             with plot_cols[0]:
@@ -181,8 +179,6 @@ if "X_umap" in adata.obsm and available_annotations:
                 plt.close(fig)
 
         else:
-
-            # UMAP only
             fig = plot_umap(
                 adata,
                 color_by=color_by,

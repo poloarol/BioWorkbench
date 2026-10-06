@@ -1,14 +1,47 @@
 import base64
-
-import streamlit as st
 from pathlib import Path
-
+import streamlit as st
 
 st.set_page_config(
     page_title="BioWorkbench",
     page_icon="docs/images/bioworkbench-logo-small.png",
-    # layout="wide"
+    layout="wide",
 )
+
+# Remove Streamlit's default content width/padding
+st.markdown(
+    """
+    <style>
+        .stAppViewContainer .main .block-container {
+            max-width: 100%;
+            padding: 0;
+        }
+
+        /* Make the header edge-to-edge */
+        .bioworkbench-header {
+            width: 100vw;
+            margin-left: calc(50% - 50vw);
+            margin-right: calc(50% - 50vw);
+            height: 220px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .bioworkbench-header img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def app_header():
     logo_path = Path(__file__).parent / "docs" / "images" / "bioworkbench-logo.png"
@@ -18,22 +51,10 @@ def app_header():
 
     st.markdown(
         f"""
-        <div style="
-            width: 100%;
-            height: 220px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            margin-bottom: 2rem;
-        ">
+        <div class="bioworkbench-header">
             <img
                 src="data:image/png;base64,{logo_base64}"
-                style="
-                    width: 90%;
-                    max-height: 210px;
-                    object-fit: contain;
-                "
+                alt="BioWorkbench"
             >
         </div>
         """,
