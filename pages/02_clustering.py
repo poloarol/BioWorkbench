@@ -394,4 +394,11 @@ if "cluster_label" in adata.obs:
         use_container_width=True,
     )
 
+st.session_state.params.n_top_genes = n_top_genes
+st.session_state.params.n_comps = n_comps
+st.session_state.params.n_neighbors = n_neighbors
+st.session_state.params.resolution = resolution
+st.session_state.params.min_dist = min_dist
+st.session_state.params.alpha = alpha
+
 st.session_state.adatas['clustered'] = adata
