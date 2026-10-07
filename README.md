@@ -502,7 +502,7 @@ Docker provides an alternative to installing the Python dependencies directly on
 
 # 🧪 Testing
 
-BioWorkbench uses `pytest` for automated testing of its reusable computational functionality.
+BioWorkbench uses `pytest` for automated testing of its computational and utility functions, plotting behavior, and Streamlit application startup.
 
 Run the complete test suite:
 
@@ -522,7 +522,7 @@ Run a specific test:
 python -m pytest tests/<test_file>.py -k "<test_name>"
 ```
 
-The test suite is designed to validate reusable computational and utility functions while minimizing dependence on large biological datasets.
+The test suite validates the reusable analysis workflow, dataset preparation and export, visualizations, and application startup while minimizing dependence on large biological datasets.
 
 When modifying computational functionality, corresponding tests should be added or updated where appropriate.
 
