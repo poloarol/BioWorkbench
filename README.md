@@ -272,15 +272,15 @@ files. Analysis results stored in each selected AnnData object are retained in t
 
 ### BioWorkbench export bundle
 
-The Download page creates a ZIP archive named `bioworkbench.wkb` containing a manifest, selected parameters in `params.json`, and selected AnnData files under `adatas/`.
+The Download page creates a ZIP archive named `bioworkbench.wkb` containing a manifest, selected parameters in `params.json`, and selected AnnData files under `adatas/`. To import a bundle, open **01 - Cell and Gene Filtering**, upload the `.wkb` file in the sidebar, and select **Restore bundle**.
 
-This bundle is an export format, not a restorable application session. The application currently does not import `.wkb` bundles. To continue an analysis later, retain the exported `.h5ad` files and upload the desired dataset when you return.
+Restoring a bundle replaces the current session's AnnData objects and parameters with the objects and parameters included in that bundle. Import completes only after the full archive has been validated and its AnnData files have loaded. Version-1 bundles exported by earlier BioWorkbench versions remain supported. A `.wkb` is an export bundle, not a complete snapshot of the Streamlit application or its transient interface state.
 
 The export bundle can be used to:
 
 * Save an intermediate analysis state
 * Transfer an analysis between environments
-* Preserve multiple selected AnnData objects and associated parameters
+* Preserve and restore multiple selected AnnData objects and associated parameters
 
 The ZIP-based format is intentionally used rather than Python object serialization so that the session data remains inspectable and portable.
 
@@ -621,6 +621,7 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [x] Spatially variable gene analysis
 * [x] Transcript-level visualization
 * [x] ZIP-based export of selected parameters and AnnData objects
+* [x] Restore BioWorkbench `.wkb` export bundles
 * [x] Automated tests
 * [x] Containerized execution
 
@@ -631,7 +632,6 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [ ] Expanded spatial data validation
 * [ ] More robust annotation workflows
 * [ ] Additional spatial visualization capabilities
-* [ ] Reload BioWorkbench `.wkb` export bundles
 * [ ] Improved reproducibility and configuration management
 * [ ] Expanded documentation
 * [ ] Continuous integration

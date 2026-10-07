@@ -18,6 +18,7 @@ from src.plotting import (
     plot_spatial,
     plot_spatial_genes
 )
+from src.session_bundle import load_session_bundle
 
 
 # ============================================================
@@ -118,12 +119,109 @@ def get_filtering_config(dataset_type, technology=None):
 
     raise ValueError(f"Unsupported dataset type: {dataset_type}")
 
+
+def get_saved_number(name, fallback, minimum, maximum, *, integer=False):
+    """Return a bounded numeric parameter restored from an export bundle."""
+    saved_params = st.session_state.get("params")
+    if not isinstance(saved_params, dict):
+        return fallback
+
+    value = saved_params.get(name, fallback)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return fallback
+
+    value = min(max(value, minimum), maximum)
+    return int(value) if integer else float(value)
+
+
 # ============================================================
 # Sidebar
 # ============================================================
 
 with st.sidebar:
     st.title("Single-cell Analysis")
+
+    st.subheader("Restore an export bundle")
+    st.caption(
+        "Upload a .wkb bundle to replace the current analysis objects "
+        "and parameters."
+    )
+    bundle_file = st.file_uploader(
+        "Upload a BioWorkbench bundle",
+        type=["wkb"],
+        key="session_bundle_upload",
+        max_upload_size=500,
+    )
+    if st.button(
+        "Restore bundle",
+        disabled=bundle_file is None,
+        key="restore_session_bundle",
+        use_container_width=True,
+    ):
+        try:
+            imported_adatas, imported_params = load_session_bundle(
+                bundle_file.getvalue()
+            )
+
+            spatial_keys = {
+                "filtered_w_blanks",
+                "filtered_wout_blanks",
+            }
+            contains_spatial_data = bool(
+                spatial_keys.intersection(imported_adatas)
+            )
+            contains_spatial_metadata = any(
+                "spatial" in adata.obsm
+                or {"center_x", "center_y"}.issubset(adata.obs.columns)
+                or "pct_counts_blank" in adata.obs.columns
+                for adata in imported_adatas.values()
+            )
+            is_spatial = (
+                contains_spatial_data
+                or contains_spatial_metadata
+                or imported_params.get("is_spatial") is True
+            )
+
+            st.session_state.adatas = imported_adatas
+            st.session_state.params = imported_params
+            st.session_state.is_spatial = is_spatial
+            saved_technology = imported_params.get("spatial_technology")
+            st.session_state["spatial_technology"] = (
+                saved_technology
+                if is_spatial and saved_technology == "MERFISH"
+                else "MERFISH"
+                if is_spatial
+                else "None — single-cell dataset"
+            )
+            st.session_state.filtered = any(
+                key in imported_adatas
+                for key in (
+                    "filtered_w_doublets",
+                    "filtered_wout_doublets",
+                    "filtered_w_blanks",
+                    "filtered_wout_blanks",
+                )
+            )
+            st.session_state["module_score"] = sorted({
+                column
+                for adata in imported_adatas.values()
+                for column in adata.obs.columns
+                if column.startswith("module_")
+            })
+            st.session_state.loaded_adata_modality = is_spatial
+            st.session_state.bundle_restored = True
+
+            st.success(
+                f"Restored {len(imported_adatas)} AnnData object(s) and "
+                f"{len(imported_params)} parameter(s). The previous session "
+                "state was replaced."
+            )
+        except (ValueError, OSError) as exc:
+            st.error(
+                f"Could not restore the bundle: {type(exc).__name__}: {exc}"
+            )
+
+    st.divider()
     
     spatial_technology = st.sidebar.selectbox(
         "Technology",
@@ -134,10 +232,10 @@ with st.sidebar:
             # "CosMX",
             # "Visium HD",
         ],
+        key="spatial_technology",
     )
     
     is_spatial = spatial_technology != "None — single-cell dataset"
-    st.session_state["spatial_technology"] = spatial_technology
     st.session_state["is_spatial"] = is_spatial
     
     config = get_filtering_config(
@@ -174,14 +272,28 @@ with st.sidebar:
     # Load uploaded files
     # --------------------------------------------------------
 
+    if adata_file is None and st.session_state.get("bundle_restored"):
+        st.session_state.bundle_restored = False
+        st.session_state.uploaded_adata_name = None
+        st.session_state.loaded_adata_signature = None
+        st.session_state.loaded_adata_modality = None
+
     if adata_file is not None:
         uploaded_bytes = adata_file.getvalue()
         upload_signature = hashlib.sha256(uploaded_bytes).hexdigest()
-        if (
+        is_unchanged_upload_after_restore = (
+            st.session_state.get("bundle_restored")
+            and st.session_state.uploaded_adata_name == adata_file.name
+            and st.session_state.loaded_adata_signature == upload_signature
+        )
+        if is_unchanged_upload_after_restore:
+            pass
+        elif (
             st.session_state.uploaded_adata_name != adata_file.name
             or st.session_state.loaded_adata_modality != is_spatial
             or st.session_state.loaded_adata_signature != upload_signature
         ):
+            st.session_state.bundle_restored = False
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
                     tmp_path = Path(temp_dir) / "upload.h5ad"
@@ -258,47 +370,79 @@ with st.sidebar:
     exp_doublet_rate: float = 0.0
 
     with st.form("filter_form"):
+        min_genes_default = get_saved_number(
+            "min_genes",
+            config.get("min_genes", 200),
+            0,
+            1_000_000,
+            integer=True,
+        )
         min_genes = st.number_input(
             "Minimum genes",
             min_value=0,
             max_value=1_000_000,
-            value=config.get("min_genes", 200),
+            value=min_genes_default,
             step=10,
         )
 
+        min_cells_default = get_saved_number(
+            "min_cells",
+            config.get("min_cells", 3),
+            0,
+            1_000_000,
+            integer=True,
+        )
         min_cells = st.number_input(
             "Minimum cells",
             min_value=0,
             max_value=1_000_000,
-            value=config.get("min_cells", 3),
+            value=min_cells_default,
             step=1,
         )
         
         if is_spatial:
             
+            blank_threshold_default = get_saved_number(
+                "blank_threshold",
+                float(config.get("blank_threshold", 5.0)),
+                0.0,
+                100.0,
+            )
             blank_threshold = st.number_input(
                 "Blank threshold",
                 min_value=0.0,
                 max_value=100.0,
-                value=float(config.get('blank_threshold', 5.0)),
+                value=blank_threshold_default,
                 step=1.0
             )
             
         else:
 
+            max_mt_percentage_default = get_saved_number(
+                "max_mt_percentage",
+                float(config.get("max_mito_percent", 20.0)),
+                0.0,
+                100.0,
+            )
             max_mt_percentage = st.number_input(
                 "Maximum mitochondrial gene percentage",
                 min_value=0.0,
                 max_value=100.0,
-                value=float(config.get("max_mito_percent", 20.0)),
+                value=max_mt_percentage_default,
                 step=1.0,
             )
 
+            exp_doublet_rate_default = get_saved_number(
+                "exp_doublet_rate",
+                float(config.get("expected_doublet_rate", 0.05)),
+                0.0,
+                1.0,
+            )
             exp_doublet_rate = st.number_input(
                 "Expected doublet rate",
                 min_value=0.0,
                 max_value=1.0,
-                value=float(config.get("expected_doublet_rate", 0.05)),
+                value=exp_doublet_rate_default,
                 step=0.01,
             )
             
@@ -1168,10 +1312,18 @@ elif selected == "Statistics":
                     f"Unable to calculate summary: {e}"
                 )
 
-st.session_state.params = {
+if "params" not in st.session_state or not isinstance(
+    st.session_state.params,
+    dict,
+):
+    st.session_state.params = {}
+
+st.session_state.params.update({
     "min_genes": min_genes,
     "min_cells": min_cells,
     "blank_threshold": blank_threshold,
     "max_mt_percentage": max_mt_percentage,
-    "exp_doublet_rate": exp_doublet_rate
-}
+    "exp_doublet_rate": exp_doublet_rate,
+    "is_spatial": is_spatial,
+    "spatial_technology": spatial_technology,
+})

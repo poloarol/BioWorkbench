@@ -75,8 +75,9 @@ Desktop or another working Docker engine must be running to build and start it.
 
 5. Open **04 - Gene & Module Visualizer** to inspect gene expression and
    calculate module scores from selected genes.
-6. Open **05 - Download** to select analysis parameters and AnnData objects for
-   export.
+6. Open **05 - Download** to export selected parameters and AnnData objects.
+   To restore a previously exported `.wkb` bundle, use the bundle uploader and
+   **Restore bundle** button in the **01 - Cell and Gene Filtering** sidebar.
 
 Some pages require results from earlier steps. If a prerequisite is missing,
 return to the relevant page, complete that step, and try again.
@@ -85,14 +86,18 @@ return to the relevant page, complete that step, and try again.
 
 The Download page creates `bioworkbench.wkb`, a ZIP archive containing a
 manifest, selected parameters, and selected AnnData objects as `.h5ad` files.
-The `.wkb` file is an export bundle, **not** a restorable application session;
-BioWorkbench cannot currently import it. Keep exported `.h5ad` files if you
-need to use the data in a later session.
+To restore its contents, upload the `.wkb` file in the sidebar on **01 - Cell
+and Gene Filtering** and select **Restore bundle**. Restoring replaces the
+current session's AnnData objects and parameters with those included in the
+bundle. The full bundle is validated and loaded before the current state is
+replaced. Earlier version-1 bundles are supported. A `.wkb` file is an export
+bundle, not a complete snapshot of the application's transient interface
+state; retain `.h5ad` files when you need standard AnnData files for other
+tools.
 
 ## Known limitations
 
 - MERFISH is the only spatial technology currently exposed in the application.
-- The `.wkb` export bundle cannot be loaded back into the application.
 - Annotation, visualization, and clustering depend on the relevant upstream
   analysis having completed in the current session.
 - Large datasets and computationally expensive analysis steps may take

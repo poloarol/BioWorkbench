@@ -1,10 +1,4 @@
-import json
-import tempfile
-import zipfile
-from pathlib import Path
-
 import streamlit as st
-
 
 # -----------------------------------------------------------------------------
 # Downloads
@@ -143,85 +137,18 @@ if total_selected == 0:
     st.info("Select at least one item to download.")
 
 else:
-    # -------------------------------------------------------------------------
-    # Create ZIP archive
-    # -------------------------------------------------------------------------
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-        zip_path = temp_path / "bioworkbench.wkb"
-
-        with zipfile.ZipFile(
-            zip_path,
-            mode="w",
-            compression=zipfile.ZIP_DEFLATED,
-        ) as zf:
-
-            # -----------------------------------------------------------------
-            # Manifest
-            # -----------------------------------------------------------------
-
-            manifest = {
-                "format": "BioWorkbench",
-                "version": 1,
-                "params": [str(key) for key in selected_params],
-                "adatas": [str(name) for name in selected_adatas],
-            }
-
-            zf.writestr(
-                "manifest.json",
-                json.dumps(
-                    manifest,
-                    indent=2,
-                    default=str,
-                ),
-            )
-
-            # -----------------------------------------------------------------
-            # Parameters
-            # -----------------------------------------------------------------
-
-            selected_params_data = {
-                str(key): params[key]
-                for key in selected_params
-            }
-
-            zf.writestr(
-                "params.json",
-                json.dumps(
-                    selected_params_data,
-                    indent=2,
-                    default=str,
-                ),
-            )
-
-            # -----------------------------------------------------------------
-            # AnnData
-            # -----------------------------------------------------------------
-
-            for name in selected_adatas:
-                adata = adatas[name]
-
-                safe_name = (
-                    str(name)
-                    .replace("/", "_")
-                    .replace("\\", "_")
-                )
-
-                adata_path = temp_path / f"{safe_name}.h5ad"
-
-                adata.write_h5ad(adata_path)
-
-                zf.write(
-                    adata_path,
-                    arcname=f"adatas/{safe_name}.h5ad",
-                )
-
-        # ---------------------------------------------------------------------
-        # Read ZIP into memory for Streamlit
-        # ---------------------------------------------------------------------
-
-        zip_data = zip_path.read_bytes()
+    selected_params_data = {
+        str(key): params[key]
+        for key in selected_params
+    }
+    selected_adata_data = {
+        str(name): adatas[name]
+        for name in selected_adatas
+    }
+    zip_data = create_session_bundle(
+        selected_adata_data,
+        selected_params_data,
+    )
 
     # -------------------------------------------------------------------------
     # Download
