@@ -1,38 +1,127 @@
-# BioWorkbench Beta
+# BioWorkbench Beta Testing Guide
 
-BioWorkbench is currently in beta.
+BioWorkbench is research software in active beta development. This guide is for
+people trying the application and reporting feedback. Analysis results should
+be reviewed independently; BioWorkbench is not a clinical diagnostic tool.
 
-## What to test
+## What is currently supported
 
-- Loading an AnnData object
-- QC and filtering
-- Clustering
-- Cell-type annotation
-- UMAP visualization
-- MERFISH spatial visualization
-- Spatial domain identification
-- Export
+- Conventional single-cell RNA-seq data stored in AnnData `.h5ad` files
+- MERFISH spatial data stored in AnnData `.h5ad` files
+- Cell and gene filtering, QC, PCA, UMAP, and Leiden clustering
+- Marker-gene analysis and CellTypist-based annotation
+- Gene and module-score visualization
+- Spatial-domain analysis and spatial visualization for MERFISH
+- Export of selected AnnData objects and analysis parameters
+
+Other spatial technologies, including Xenium, CosMX, and Visium HD, are not
+currently available in the interface.
+
+## Before you start
+
+- Use an `.h5ad` file that can be opened with AnnData/Scanpy.
+- The upload widget currently accepts files up to **500 MB**.
+- For single-cell RNA-seq, the expression matrix should be in `adata.X`.
+  Mitochondrial genes are identified by names beginning with `MT-`.
+- MERFISH data must include `center_x` and `center_y` columns in
+  `adata.obs`. Blank-probe genes are identified by names beginning with
+  `Blank-`. Spatial QC plots also require a `volume` column in `adata.obs`.
+- Keep a copy of your input data. Filtering and analysis operate on AnnData
+  objects held during the current application session.
+
+## Start the application
+
+### Run locally
+
+Install the repository dependencies and start Streamlit:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py --server.maxUploadSize=500
+```
+
+Open <http://localhost:8501>.
+
+### Run with Docker
+
+From the repository root:
+
+```bash
+docker build -t bioworkbench .
+docker run --rm -p 8501:8501 bioworkbench
+```
+
+Open <http://localhost:8501>. The container also has a health check. Docker
+Desktop or another working Docker engine must be running to build and start it.
+
+## Suggested test workflow
+
+1. Open **01 - Cell and Gene Filtering**, select the data type, and upload an
+   `.h5ad` file.
+2. Inspect the dataset overview and QC plots. Adjust the filtering values and
+   select **Apply filters**.
+3. Open **02 - Exploratory Analysis & Clustering**. Run PCA first, then run
+   UMAP + Leiden. For MERFISH, spatial-domain analysis is available on this
+   page as well.
+4. Open **03 - Celltype Annotation** after clustering. Try a CellTypist model,
+   or upload a JSON object mapping cell IDs to annotation labels, for example:
+
+   ```json
+   {
+     "cell_001": "T cell",
+     "cell_002": "B cell"
+   }
+   ```
+
+5. Open **04 - Gene & Module Visualizer** to inspect gene expression and
+   calculate module scores from selected genes.
+6. Open **05 - Download** to select analysis parameters and AnnData objects for
+   export.
+
+Some pages require results from earlier steps. If a prerequisite is missing,
+return to the relevant page, complete that step, and try again.
+
+## Export and session behavior
+
+The Download page creates `bioworkbench.wkb`, a ZIP archive containing a
+manifest, selected parameters, and selected AnnData objects as `.h5ad` files.
+The `.wkb` file is an export bundle, **not** a restorable application session;
+BioWorkbench cannot currently import it. Keep exported `.h5ad` files if you
+need to use the data in a later session.
 
 ## Known limitations
 
-- MERFISH is the only supported spatial technology
-- ...
-- ...
- 
-## Please report
+- MERFISH is the only spatial technology currently exposed in the application.
+- The `.wkb` export bundle cannot be loaded back into the application.
+- Annotation, visualization, and clustering depend on the relevant upstream
+  analysis having completed in the current session.
+- Large datasets and computationally expensive analysis steps may take
+  considerable time and memory.
+- The application and analysis methods are evolving; results and workflows
+  may change between beta versions.
 
-- Bugs
-- confusing UI
-- unexpected results
-- missing functionality
-- installation problems
-- performance problems
+## What feedback is useful?
 
-## Reporting issues
+Please report bugs, confusing interactions, unexpected results, installation or
+dependency problems, performance issues, and missing capabilities. You do not
+need to know whether an issue is a software defect before reporting it.
 
-Please open a GitHub issue and include:
-- operating system
-- installation method
-- dataset characteristics
-- steps to reproduce
-- error message / screenshot
+When possible, include:
+
+- BioWorkbench version or Git commit, if known
+- Operating system and Python/Docker setup
+- The page and action you were using
+- Steps to reproduce the behavior
+- What you expected and what happened instead
+- The complete error message or traceback
+- Dataset format, approximate number of cells and genes, and relevant metadata
+  columns
+- Screenshots, if they clarify the issue
+
+Please do not attach identifiable, confidential, or otherwise sensitive
+biological data to a public issue. A small synthetic or appropriately
+de-identified example is usually more useful and safer.
+
+Open a GitHub issue in the BioWorkbench repository and include the details
+above. For installation or Docker problems, include the command you ran and
+the relevant output.
