@@ -153,8 +153,9 @@ def data_filtering(adata,
         # Filter cells based on mitochondrial gene percentage
         adata = _filter_mitochondrial_genes(adata, max_mt_percentage)
         
-        # Identify potential doublets in the dataset
-        adata = _identify_doublets(adata, expected_doublet_rate)
+        # Scrublet requires enough cells and genes to build a model.
+        if adata.n_obs > 1 and adata.n_vars > 0:
+            adata = _identify_doublets(adata, expected_doublet_rate)
     
     else:
         # Identify potential blank droplets in the dataset

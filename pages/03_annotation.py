@@ -6,8 +6,19 @@ import streamlit as st
 from celltypist import models
 from matplotlib import pyplot as plt
 
-from src.clustering import run_clustering
 from src.plotting import plot_umap, plot_spatial
+
+if "is_spatial" not in st.session_state:
+    st.session_state["is_spatial"] = False
+
+
+adatas = st.session_state.get("adatas", {})
+adata = adatas.get("clustered") if isinstance(adatas, dict) else None
+
+if adata is None:
+    st.info("Run PCA and clustering on the Clustering page before annotation.")
+    st.stop()
+
 
 @st.cache_data
 def get_celltypist_models():
@@ -15,12 +26,8 @@ def get_celltypist_models():
 
     return models.models_description()
 
-adata = None
 selected_model = None
 model_info = get_celltypist_models()
-
-if 'clustered' in st.session_state.adatas:
-    adata = st.session_state.adatas['clustered']
 
 with st.sidebar:
 
@@ -115,7 +122,11 @@ if annotation_file is not None:
     try:
         # Load custom annotations from the uploaded JSON file
         custom_annotations = json.load(annotation_file)
-        adata.obs["custom_annotation"] = adata.obs["annotation"].map(custom_annotations)
+        if not isinstance(custom_annotations, dict):
+            raise ValueError("Expected a JSON object mapping cell IDs to labels.")
+        adata.obs["custom_annotation"] = adata.obs_names.map(
+            custom_annotations
+        )
 
     except Exception as e:
         st.error(

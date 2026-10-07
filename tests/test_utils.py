@@ -87,6 +87,44 @@ def test_load_data_prepares_spatial_metadata(tmp_path):
         loaded.obsm["spatial"],
         np.array([[10.0, 30.0], [20.0, 40.0]]),
     )
+    assert loaded.obs["log1p_total_counts"].tolist() == pytest.approx(
+        np.log1p([4, 6])
+    )
+
+
+@pytest.mark.parametrize(
+    ("cell_columns", "genes", "expected_obs", "expected_vars"),
+    [
+        (["Cell1", "Cell4"], None, ["Cell1", "Cell4"], [
+            "GeneA", "GeneB", "GeneC", "GeneD", "MT-GeneE"
+        ]),
+        (None, ["GeneA", "GeneD"], [
+            "Cell1", "Cell2", "Cell3", "Cell4", "Cell5"
+        ], ["GeneA", "GeneD"]),
+    ],
+)
+def test_load_data_allows_subsetting_one_axis(
+    tmp_path,
+    small_adata,
+    cell_columns,
+    genes,
+    expected_obs,
+    expected_vars,
+):
+    filepath = tmp_path / "input.h5ad"
+    small_adata.write_h5ad(filepath)
+
+    result = load_data(
+        str(filepath),
+        cell_columns=cell_columns,
+        genes=genes,
+    )
+
+    try:
+        assert list(result["subset"].obs_names) == expected_obs
+        assert list(result["subset"].var_names) == expected_vars
+    finally:
+        result["raw"].file.close()
 
 
 def test_write_to_disk_round_trips_anndata(tmp_path, small_adata):

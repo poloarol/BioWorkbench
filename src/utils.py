@@ -25,9 +25,8 @@ def load_data(filepath: str,
         A dictionary containing the loaded data.
     """
     
-    adata = None
     sdata = None
-    
+
     if genes is None and cell_columns is None:
         adata = sc.read(filepath)
         _calculate_qc_metrics(adata, is_spatial=is_spatial)
@@ -43,7 +42,9 @@ def load_data(filepath: str,
             adata.obsm["spatial"] = adata.obs[["center_x", "center_y"]].to_numpy()
     else:
         adata = sc.read(filepath, backed='r')
-        sdata = adata[cell_columns, genes].to_memory()
+        obs_index = slice(None) if cell_columns is None else cell_columns
+        var_index = slice(None) if genes is None else genes
+        sdata = adata[obs_index, var_index].to_memory()
         _calculate_qc_metrics(sdata, is_spatial=is_spatial)
         sdata.layers['raw'] = sdata.X.copy()
         if is_spatial:
@@ -126,6 +127,7 @@ def _calculate_qc_metrics(adata, is_spatial=False):
             adata,
             percent_top=None,
             inplace=True,
+            log1p=True,
         )
         return
 

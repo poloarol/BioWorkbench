@@ -4,6 +4,9 @@ import pandas as pd
 import scanpy as sc
 import streamlit as st
 
+if "is_spatial" not in st.session_state:
+    st.session_state["is_spatial"] = False
+
 from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains
 from src.plotting import plot_pca, plot_umap, plot_spatial
 
@@ -78,12 +81,21 @@ with st.sidebar:
 
 adata = None
 
-if not st.session_state.is_spatial:
-    adata = st.session_state.adatas['filtered_wout_doublets']
-    col1, col2 = st.columns(2)
-else:
-    adata = st.session_state.adatas['filtered_wout_blanks']
+filtered_key = (
+    "filtered_wout_blanks"
+    if st.session_state.get("is_spatial", False)
+    else "filtered_wout_doublets"
+)
+adata = st.session_state.get("adatas", {}).get(filtered_key)
+
+if adata is None:
+    st.info("Apply filtering on the Cell and Gene Filtering page first.")
+    st.stop()
+
+if st.session_state.get("is_spatial", False):
     col1, col2, col3 = st.columns(3)
+else:
+    col1, col2 = st.columns(2)
 
 # -----------------------------------------------------------------------------
 # Pipeline controls
@@ -393,6 +405,9 @@ if "cluster_label" in adata.obs:
         cluster_counts,
         use_container_width=True,
     )
+
+if "params" not in st.session_state:
+    st.session_state.params = {}
 
 st.session_state.params['n_top_genes'] = n_top_genes
 st.session_state.params['n_comps'] = n_comps

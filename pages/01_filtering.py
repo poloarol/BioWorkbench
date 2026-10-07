@@ -1,4 +1,5 @@
 import tempfile
+import hashlib
 import yaml
 
 from pathlib import Path
@@ -27,6 +28,12 @@ CONFIG_PATH = Path(__file__).parents[1] / "config" / "params.yaml"
 
 if "adatas" not in st.session_state:
     st.session_state.adatas = {}
+
+if "loaded_adata_modality" not in st.session_state:
+    st.session_state.loaded_adata_modality = None
+
+if "loaded_adata_signature" not in st.session_state:
+    st.session_state.loaded_adata_signature = None
 
 if "filtered" not in st.session_state:
     st.session_state.filtered = False
@@ -75,6 +82,7 @@ def get_adata(key: str):
 
 def clear_filtered_results():
     """Remove previous filtering results."""
+    st.session_state.filtered = False
     if not isinstance(st.session_state.adatas, dict):
         return
 
@@ -82,7 +90,16 @@ def clear_filtered_results():
     st.session_state.adatas.pop("filtered_wout_doublets", None)
     st.session_state.adatas.pop("filtered_w_blanks", None)
     st.session_state.adatas.pop("filtered_wout_blanks", None)
-    st.session_state.filtered = False
+
+
+def clear_downstream_results():
+    """Remove analysis outputs that depend on the currently loaded dataset."""
+    clear_filtered_results()
+    if not isinstance(st.session_state.adatas, dict):
+        return
+    st.session_state.adatas.pop("clustered", None)
+    st.session_state.adatas.pop("annotated", None)
+    st.session_state["module_score"] = []
 
 
 def load_filtering_config():
@@ -158,35 +175,52 @@ with st.sidebar:
     # --------------------------------------------------------
 
     if adata_file is not None:
-        # Only reload when a different file is uploaded.
-        if st.session_state.uploaded_adata_name != adata_file.name:
+        uploaded_bytes = adata_file.getvalue()
+        upload_signature = hashlib.sha256(uploaded_bytes).hexdigest()
+        if (
+            st.session_state.uploaded_adata_name != adata_file.name
+            or st.session_state.loaded_adata_modality != is_spatial
+            or st.session_state.loaded_adata_signature != upload_signature
+        ):
             try:
-                with tempfile.NamedTemporaryFile(
-                    suffix=".h5ad",
-                    delete=False,
-                ) as tmp:
-                    tmp.write(adata_file.getvalue())
-                    tmp_path = tmp.name
-
-                loaded_adatas = load_data(tmp_path, is_spatial=is_spatial)
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    tmp_path = Path(temp_dir) / "upload.h5ad"
+                    tmp_path.write_bytes(uploaded_bytes)
+                    loaded_adatas = load_data(
+                        str(tmp_path),
+                        is_spatial=is_spatial,
+                    )
 
                 if loaded_adatas is None:
                     st.error("The .h5ad file did not contain any data.")
+                    clear_downstream_results()
+                    st.session_state.adatas["raw"] = None
+                    st.session_state.uploaded_adata_name = None
+                    st.session_state.loaded_adata_modality = None
+                    st.session_state.loaded_adata_signature = None
                 elif not isinstance(loaded_adatas, dict):
                     st.error(
                         "load_data() returned an unexpected object. "
                         "Expected a dictionary containing AnnData objects."
                     )
+                    clear_downstream_results()
+                    st.session_state.adatas["raw"] = None
+                    st.session_state.uploaded_adata_name = None
+                    st.session_state.loaded_adata_modality = None
+                    st.session_state.loaded_adata_signature = None
                 else:
-                    print(loaded_adatas)
+                    clear_downstream_results()
                     st.session_state.adatas['raw'] = loaded_adatas['raw']
                     st.session_state.uploaded_adata_name = adata_file.name
-                    st.session_state.filtered = False
+                    st.session_state.loaded_adata_modality = is_spatial
+                    st.session_state.loaded_adata_signature = upload_signature
 
             except Exception as e:
+                clear_downstream_results()
                 st.session_state.adatas['raw'] = None
                 st.session_state.uploaded_adata_name = None
-                st.session_state.filtered = False
+                st.session_state.loaded_adata_modality = None
+                st.session_state.loaded_adata_signature = None
                 
                 import traceback
 
@@ -311,14 +345,20 @@ with st.sidebar:
                         "The filters removed all cells. "
                         "Try less restrictive filtering parameters."
                     )
-                    st.session_state.adatas[
-                        "filtered_w_doublets"
-                    ] = adata_filtered
-
-                    st.session_state.adatas[
-                        "filtered_wout_doublets"
-                    ] = adata_filtered.copy()
-
+                    if is_spatial:
+                        st.session_state.adatas[
+                            "filtered_w_blanks"
+                        ] = adata_filtered
+                        st.session_state.adatas[
+                            "filtered_wout_blanks"
+                        ] = adata_filtered.copy()
+                    else:
+                        st.session_state.adatas[
+                            "filtered_w_doublets"
+                        ] = adata_filtered
+                        st.session_state.adatas[
+                            "filtered_wout_doublets"
+                        ] = adata_filtered.copy()
                     st.session_state.filtered = True
 
                 else:
@@ -330,6 +370,13 @@ with st.sidebar:
                                 "Blank-specific results may be unavailable."
                             )
                             adata_without_blanks = adata_filtered.copy()
+                            st.session_state.adatas[
+                                "filtered_wout_blanks"
+                            ] = adata_without_blanks
+                            st.session_state.adatas[
+                                "filtered_w_blanks"
+                            ] = adata_filtered
+                            st.session_state.filtered = True
                         else:
                             adata_without_blanks = adata_filtered[
                                 ~adata_filtered.obs['is_blank']
@@ -420,7 +467,12 @@ st.caption(
 )
 
 if is_spatial:
-    blank_percentage: int = (base_adata.obs["blank_counts"].to_numpy().sum() / base_adata.var["total_counts"].sum()) * 100
+    total_counts = base_adata.obs["total_counts"].sum()
+    blank_percentage = (
+        base_adata.obs["blank_counts"].sum() / total_counts * 100
+        if total_counts
+        else 0
+    )
     st.caption(f"Blank gene percentage: {blank_percentage:.2f}%")
 
 st.divider()
@@ -528,9 +580,21 @@ if selected == "Top Gene":
             "The following lists show the top spatially variable genes for each dataset subset."
         )
         
-        gene_set1 = get_spatially_variable_genes(base_adata, n_top_genes=10)
-        gene_set2 = get_spatially_variable_genes(filtered_adata, n_top_genes=10)
-        gene_set3 = get_spatially_variable_genes(singlet_adata, n_top_genes=10)
+        gene_set1 = (
+            get_spatially_variable_genes(base_adata, n_top_genes=10)
+            if base_adata.n_obs and base_adata.n_vars
+            else []
+        )
+        gene_set2 = (
+            get_spatially_variable_genes(filtered_adata, n_top_genes=10)
+            if filtered_adata.n_obs and filtered_adata.n_vars
+            else []
+        )
+        gene_set3 = (
+            get_spatially_variable_genes(singlet_adata, n_top_genes=10)
+            if singlet_adata.n_obs and singlet_adata.n_vars
+            else []
+        )
 
         col1, col2, col3 = st.columns(3)
         
@@ -543,7 +607,10 @@ if selected == "Top Gene":
                 placeholder="Select a Spatially Variable Gene"
             )
             
-            st.pyplot(plot_spatial_genes(base_adata, genes=[color_by]), use_container_width=True)
+            if color_by is not None:
+                st.pyplot(plot_spatial_genes(base_adata, genes=[color_by]), use_container_width=True)
+            else:
+                st.info("No spatially variable genes are available.")
 
         with col2:
             st.subheader("Filtered with Blanks")
@@ -553,7 +620,10 @@ if selected == "Top Gene":
                 key="svg2",
                 placeholder="Select a Spatially Variable Gene"
             )
-            st.pyplot(plot_spatial_genes(filtered_adata, genes=[color_by]), use_container_width=True)
+            if color_by is not None:
+                st.pyplot(plot_spatial_genes(filtered_adata, genes=[color_by]), use_container_width=True)
+            else:
+                st.info("No spatially variable genes are available.")
 
         with col3:
             st.subheader("Filtered without Blanks")
@@ -563,7 +633,10 @@ if selected == "Top Gene":
                 key="svg3",
                 placeholder="Select a Spatially Variable Gene"
             )
-            st.pyplot(plot_spatial_genes(singlet_adata, genes=[color_by]), use_container_width=True)
+            if color_by is not None:
+                st.pyplot(plot_spatial_genes(singlet_adata, genes=[color_by]), use_container_width=True)
+            else:
+                st.info("No spatially variable genes are available.")
 
     else:
         
@@ -624,11 +697,11 @@ elif selected == "QC Metrics":
                 st.pyplot(fig_one, use_container_width=True)
             with col2:
                 spatial_qc_plt = plot_spatial(
-                    filtered_adata,
+                    base_adata,
                     color_by=[
-                        "is_blank",
-                        "log1p_n_genes_by_counts",
-                        "log1p_total_counts",
+                        "pct_counts_blank",
+                        "n_genes_by_counts",
+                        "total_counts",
                     ],
                 )
                 st.pyplot(spatial_qc_plt, use_container_width=True)     
@@ -647,8 +720,8 @@ elif selected == "QC Metrics":
                     filtered_adata,
                     color_by=[
                         "is_blank",
-                        "log1p_n_genes_by_counts",
-                        "log1p_total_counts",
+                        "n_genes_by_counts",
+                        "total_counts",
                     ],
                 )
                 st.pyplot(spatial_qc_plt, use_container_width=True)
@@ -667,8 +740,8 @@ elif selected == "QC Metrics":
                     singlet_adata,
                     color_by=[
                         # "is_blank",
-                        "log1p_n_genes_by_counts",
-                        "log1p_total_counts",
+                        "n_genes_by_counts",
+                        "total_counts",
                     ],
                 )
                 st.pyplot(spatial_qc_plt, use_container_width=True)

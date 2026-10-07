@@ -78,6 +78,11 @@ def run_pca(adata: sc.AnnData, n_top_genes: int = 2000, n_comps: int = 50) -> sc
         The AnnData object with PCA embeddings.
     """
 
+    if "raw" not in adata.layers:
+        adata.layers["raw"] = adata.X.copy()
+    else:
+        adata.X = adata.layers["raw"].copy()
+
     adata = _normalize_and_log_transform(adata)
     adata = _identify_highly_variable_genes(adata, n_top_genes=n_top_genes)
     adata = _run_pca(adata, n_comps=n_comps)

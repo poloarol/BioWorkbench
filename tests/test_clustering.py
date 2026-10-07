@@ -243,6 +243,25 @@ def test_run_pca_uses_default_parameters(small_adata):
     assert result is small_adata
 
 
+def test_run_pca_repeat_uses_original_counts(small_adata):
+    original_counts = small_adata.X.copy()
+
+    first_result = run_pca(
+        small_adata,
+        n_top_genes=3,
+        n_comps=2,
+    )
+    first_normalized = first_result.X.copy()
+    second_result = run_pca(
+        first_result,
+        n_top_genes=3,
+        n_comps=2,
+    )
+
+    assert np.array_equal(second_result.layers["raw"], original_counts)
+    assert np.allclose(second_result.X, first_normalized)
+
+
 # Marker genes
 
 def test_identify_marker_genes(small_adata):

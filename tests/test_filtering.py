@@ -254,6 +254,35 @@ def test_data_filtering_passes_results_between_steps(small_adata):
     assert result is filtered_doublets
 
 
+def test_data_filtering_skips_doublet_detection_for_empty_data():
+    import anndata as ad
+    import numpy as np
+
+    adata = ad.AnnData(np.eye(3))
+    adata.var_names = ["GeneA", "GeneB", "GeneC"]
+    adata.obs["pct_counts_mt"] = [0.0, 0.0, 0.0]
+
+    result = data_filtering(
+        adata,
+        min_genes=10,
+        min_cells=1,
+    )
+
+    assert result.n_obs == 0
+    assert "predicted_doublet" not in result.obs
+
+
+def test_data_filtering_skips_doublet_detection_without_genes(small_adata):
+    result = data_filtering(
+        small_adata,
+        min_genes=1,
+        min_cells=6,
+    )
+
+    assert result.n_vars == 0
+    assert "predicted_doublet" not in result.obs
+
+
 from unittest.mock import patch
 
 
