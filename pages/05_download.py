@@ -1,9 +1,6 @@
-import os
-import streamlit as st
-import tempfile
+import pickle
 
-import pandas as pd
-import scanpy as sc
+import streamlit as st
 
 
 # -----------------------------------------------------------------------------
@@ -13,84 +10,179 @@ import scanpy as sc
 st.divider()
 st.subheader("Download")
 
+params = st.session_state.get("params")
+adatas = st.session_state.get("adatas")
+
+
+# -----------------------------------------------------------------------------
+# Selection
+# -----------------------------------------------------------------------------
+
+selected_params = []
+selected_adatas = []
+
+col_params, col_adatas = st.columns(2)
+
+
 # -----------------------------------------------------------------------------
 # Parameters
 # -----------------------------------------------------------------------------
 
-st.markdown("### Parameters")
+with col_params:
+    st.markdown("### Parameters")
 
-params = st.session_state.get("params")
+    if isinstance(params, dict) and params:
 
-if params:
-    params_df = pd.DataFrame(
-        list(params.items()),
-        columns=["parameter", "value"],
-    )
+        select_all_params = st.checkbox(
+            "Select all parameters",
+            value=True,
+            key="select_all_params",
+        )
 
-    csv_data = params_df.to_csv(index=False).encode("utf-8")
+        key_col, value_col = st.columns([1, 2])
 
-    st.download_button(
-        label="Download parameters",
-        data=csv_data,
-        file_name="parameters.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
-else:
-    st.info("No parameters are available to download.")
+        with key_col:
+            st.markdown("**Key**")
+
+        with value_col:
+            st.markdown("**Value**")
+
+        for parameter, value in params.items():
+
+            key_col, value_col = st.columns([1, 2])
+
+            with key_col:
+                selected = st.checkbox(
+                    str(parameter),
+                    value=select_all_params,
+                    key=f"download_param_{parameter}",
+                )
+
+            with value_col:
+                st.write(str(value))
+
+            if selected:
+                selected_params.append(parameter)
+
+    else:
+        st.info("No parameters are available.")
 
 
 # -----------------------------------------------------------------------------
-# AnnData objects
+# AnnData
 # -----------------------------------------------------------------------------
 
-st.markdown("### AnnData")
+with col_adatas:
+    st.markdown("### AnnData")
 
-adatas = st.session_state.get("adatas")
+    if isinstance(adatas, dict):
 
-if isinstance(adatas, dict):
+        available_adatas = {
+            name: adata
+            for name, adata in adatas.items()
+            if adata is not None
+        }
 
-    available_adatas = {
-        name: adata
-        for name, adata in adatas.items()
-        if adata is not None
-    }
+        if available_adatas:
 
-    if available_adatas:
+            select_all_adatas = st.checkbox(
+                "Select all AnnData objects",
+                value=True,
+                key="select_all_adatas",
+            )
 
-        for name, adata in available_adatas.items():
+            name_col, size_col = st.columns([1, 1])
 
-            col1, col2 = st.columns([3, 1])
+            with name_col:
+                st.markdown("**Object**")
 
-            with col1:
-                st.write(f"**{name}**")
+            with size_col:
+                st.markdown("**Size**")
 
-                if hasattr(adata, "n_obs") and hasattr(adata, "n_vars"):
-                    st.caption(
-                        f"{adata.n_obs:,} cells × {adata.n_vars:,} genes"
+            for name, adata in available_adatas.items():
+
+                name_col, size_col = st.columns([1, 1])
+
+                with name_col:
+                    selected = st.checkbox(
+                        str(name),
+                        value=select_all_adatas,
+                        key=f"download_adata_{name}",
                     )
 
-            with col2:
+                with size_col:
+                    if hasattr(adata, "n_obs") and hasattr(adata, "n_vars"):
+                        st.write(
+                            f"{adata.n_obs:,} × {adata.n_vars:,}"
+                        )
+                    else:
+                        st.write("AnnData")
 
-                # AnnData.write_h5ad() needs a filename, so use a
-                # temporary in-memory BytesIO buffer.
-                buffer = io.BytesIO()
+                if selected:
+                    selected_adatas.append(name)
 
-                adata.write_h5ad(buffer)
-
-                buffer.seek(0)
-
-                st.download_button(
-                    label="Download",
-                    data=buffer,
-                    file_name=f"{name}.h5ad",
-                    mime="application/octet-stream",
-                    key=f"download_adata_{name}",
-                    use_container_width=True,
-                )
+        else:
+            st.info("No AnnData objects are available.")
 
     else:
         st.info("No AnnData objects are available.")
 
+
+# -----------------------------------------------------------------------------
+# Download
+# -----------------------------------------------------------------------------
+
+st.divider()
+
+n_params = len(selected_params)
+n_adatas = len(selected_adatas)
+total_selected = n_params + n_adatas
+
+st.write(
+    f"Selected: **{n_params} parameter(s)** and "
+    f"**{n_adatas} AnnData object(s)**"
+)
+
+
+if total_selected == 0:
+
+    st.info("Select at least one item to download.")
+
 else:
-    st.info("No AnnData objects are available.")
+
+    # -------------------------------------------------------------------------
+    # Build bundle from the current checkbox selections
+    # -------------------------------------------------------------------------
+
+    bundle = {
+        "version": 1,
+        "params": {
+            key: params[key]
+            for key in selected_params
+        },
+        "adatas": {
+            name: adatas[name]
+            for name in selected_adatas
+        },
+    }
+
+    # -------------------------------------------------------------------------
+    # Serialize directly in memory
+    # -------------------------------------------------------------------------
+
+    wkb_data = pickle.dumps(
+        bundle,
+        protocol=pickle.HIGHEST_PROTOCOL,
+    )
+
+    # -------------------------------------------------------------------------
+    # Download
+    # -------------------------------------------------------------------------
+
+    st.download_button(
+        label="Download selected data (.wkb)",
+        data=wkb_data,
+        file_name="bioworkbench.wkb",
+        mime="application/octet-stream",
+        use_container_width=True,
+    )

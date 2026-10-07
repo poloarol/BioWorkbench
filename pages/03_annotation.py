@@ -40,7 +40,7 @@ with st.sidebar:
         st.write(
             selected_model_info["description"]
         )
-    st.session_state.params.model = selected_model
+    # st.session_state.params['model'] = selected_model
         
     st.subheader("Custom Annotations")
 
