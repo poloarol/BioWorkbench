@@ -2,9 +2,11 @@
 
 **An interactive computational workbench for single-cell and spatial transcriptomics.**
 
-BioWorkbench is a lightweight, open-source [Streamlit](https://streamlit.io/) application for exploring, analyzing, and visualizing single-cell and spatial omics datasets through an interactive interface.
+BioWorkbench is a lightweight, open-source Streamlit application for exploring, analyzing, and visualizing single-cell and spatial omics datasets through an interactive interface.
 
-It is built around **scverse** ecosystem, while keeping the underlying computational functions separate from the user interface. The goal is to make common exploratory analyses easier to perform, inspect, and reproduce without requiring users to repeatedly modify analysis scripts.
+It is built around the **scverse ecosystem** while keeping the underlying computational functions separate from the user interface. The goal is to make common exploratory analyses easier to perform, inspect, and reproduce without requiring users to repeatedly modify analysis scripts.
+
+BioWorkbench was built for people who want to spend their time thinking about biology rather than operating the computational machinery.
 
 > 🚧 **BioWorkbench is currently in beta.**
 >
@@ -13,6 +15,8 @@ It is built around **scverse** ecosystem, while keeping the underlying computati
 ---
 
 ## Why BioWorkbench?
+
+Scientists need better environments for exploring biological data, asking questions, and forming hypotheses. BioWorkbench aims to provide that environment: a place where researchers can quickly explore their data, investigate observations, and decide what is worth analyzing further
 
 Single-cell and spatial transcriptomics analyses often involve a combination of notebooks, scripts, visualization tools, and modality-specific workflows.
 
