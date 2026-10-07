@@ -1,4 +1,7 @@
-import pickle
+import json
+import tempfile
+import zipfile
+from pathlib import Path
 
 import streamlit as st
 
@@ -32,7 +35,6 @@ with col_params:
     st.markdown("### Parameters")
 
     if isinstance(params, dict) and params:
-
         select_all_params = st.checkbox(
             "Select all parameters",
             value=True,
@@ -48,7 +50,6 @@ with col_params:
             st.markdown("**Value**")
 
         for parameter, value in params.items():
-
             key_col, value_col = st.columns([1, 2])
 
             with key_col:
@@ -76,7 +77,6 @@ with col_adatas:
     st.markdown("### AnnData")
 
     if isinstance(adatas, dict):
-
         available_adatas = {
             name: adata
             for name, adata in adatas.items()
@@ -84,7 +84,6 @@ with col_adatas:
         }
 
         if available_adatas:
-
             select_all_adatas = st.checkbox(
                 "Select all AnnData objects",
                 value=True,
@@ -100,7 +99,6 @@ with col_adatas:
                 st.markdown("**Size**")
 
             for name, adata in available_adatas.items():
-
                 name_col, size_col = st.columns([1, 1])
 
                 with name_col:
@@ -112,9 +110,7 @@ with col_adatas:
 
                 with size_col:
                     if hasattr(adata, "n_obs") and hasattr(adata, "n_vars"):
-                        st.write(
-                            f"{adata.n_obs:,} × {adata.n_vars:,}"
-                        )
+                        st.write(f"{adata.n_obs:,} × {adata.n_vars:,}")
                     else:
                         st.write("AnnData")
 
@@ -143,37 +139,89 @@ st.write(
     f"**{n_adatas} AnnData object(s)**"
 )
 
-
 if total_selected == 0:
-
     st.info("Select at least one item to download.")
 
 else:
-
     # -------------------------------------------------------------------------
-    # Build bundle from the current checkbox selections
-    # -------------------------------------------------------------------------
-
-    bundle = {
-        "version": 1,
-        "params": {
-            key: params[key]
-            for key in selected_params
-        },
-        "adatas": {
-            name: adatas[name]
-            for name in selected_adatas
-        },
-    }
-
-    # -------------------------------------------------------------------------
-    # Serialize directly in memory
+    # Create ZIP archive
     # -------------------------------------------------------------------------
 
-    wkb_data = pickle.dumps(
-        bundle,
-        protocol=pickle.HIGHEST_PROTOCOL,
-    )
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        zip_path = temp_path / "bioworkbench.wkb"
+
+        with zipfile.ZipFile(
+            zip_path,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as zf:
+
+            # -----------------------------------------------------------------
+            # Manifest
+            # -----------------------------------------------------------------
+
+            manifest = {
+                "format": "BioWorkbench",
+                "version": 1,
+                "params": [str(key) for key in selected_params],
+                "adatas": [str(name) for name in selected_adatas],
+            }
+
+            zf.writestr(
+                "manifest.json",
+                json.dumps(
+                    manifest,
+                    indent=2,
+                    default=str,
+                ),
+            )
+
+            # -----------------------------------------------------------------
+            # Parameters
+            # -----------------------------------------------------------------
+
+            selected_params_data = {
+                str(key): params[key]
+                for key in selected_params
+            }
+
+            zf.writestr(
+                "params.json",
+                json.dumps(
+                    selected_params_data,
+                    indent=2,
+                    default=str,
+                ),
+            )
+
+            # -----------------------------------------------------------------
+            # AnnData
+            # -----------------------------------------------------------------
+
+            for name in selected_adatas:
+                adata = adatas[name]
+
+                safe_name = (
+                    str(name)
+                    .replace("/", "_")
+                    .replace("\\", "_")
+                )
+
+                adata_path = temp_path / f"{safe_name}.h5ad"
+
+                adata.write_h5ad(adata_path)
+
+                zf.write(
+                    adata_path,
+                    arcname=f"adatas/{safe_name}.h5ad",
+                )
+
+        # ---------------------------------------------------------------------
+        # Read ZIP into memory for Streamlit
+        # ---------------------------------------------------------------------
+
+        zip_data = zip_path.read_bytes()
 
     # -------------------------------------------------------------------------
     # Download
@@ -181,8 +229,8 @@ else:
 
     st.download_button(
         label="Download selected data (.wkb)",
-        data=wkb_data,
+        data=zip_data,
         file_name="bioworkbench.wkb",
-        mime="application/octet-stream",
+        mime="application/zip",
         use_container_width=True,
     )

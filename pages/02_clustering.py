@@ -65,7 +65,7 @@ with st.sidebar:
         st.subheader("Spatial Domains")
 
         alpha = st.slider(
-            "Alpha (weight of the nearest neighbor graph)",
+            "Alpha (weight of spatial graph)",
             min_value=0.0,
             max_value=1.0,
             value=0.2,
@@ -98,7 +98,7 @@ with col1:
     ):
         with st.spinner("Running normalization, HVG selection and PCA..."):
             try:
-                st.session_state.adata = run_pca(
+                adata = run_pca(
                     adata=adata,
                     n_top_genes=n_top_genes,
                     n_comps=n_comps,
@@ -114,12 +114,12 @@ with col2:
         "▶ Run UMAP + Leiden",
         use_container_width=True,
     ):
-        if "X_pca" not in st.session_state.adata.obsm:
+        if "X_pca" not in adata.obsm:
             st.warning("Run PCA first.")
         else:
             with st.spinner("Running neighbors, UMAP and Leiden..."):
                 try:
-                    st.session_state.adata = run_clustering(
+                    adata = run_clustering(
                         adata=adata,
                         n_neighbors=n_neighbors,
                         min_dist=min_dist,
