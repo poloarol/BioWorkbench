@@ -24,3 +24,5 @@ __pycache__
 .DS_Store
 
 notebooks/
+tests/
+.pytest_cache/

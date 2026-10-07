@@ -256,36 +256,35 @@ The same biological variable can therefore be examined in both transcriptional a
 
 ---
 
-# 💾 Export and reload
+# 💾 Export
 
-BioWorkbench is designed to preserve the analysis state so that users can continue working with processed datasets.
+BioWorkbench can package selected analysis parameters and AnnData objects from the current Streamlit session.
 
-### AnnData export
+### AnnData files
 
-Processed datasets can be exported as standard:
+Selected AnnData objects are included as standard:
 
 ```text
 .h5ad
 ```
 
-files.
+files. Analysis results stored in each selected AnnData object are retained in that file.
 
-Marker-gene results can also be exported from the clustering workflow.
+### BioWorkbench export bundle
 
-### BioWorkbench session bundles
+The Download page creates a ZIP archive named `bioworkbench.wkb` containing a manifest, selected parameters in `params.json`, and selected AnnData files under `adatas/`.
 
-BioWorkbench also supports exporting the current analysis state as a **ZIP-based session bundle**.
+This bundle is an export format, not a restorable application session. The application currently does not import `.wkb` bundles. To continue an analysis later, retain the exported `.h5ad` files and upload the desired dataset when you return.
 
-The bundle can be reloaded into BioWorkbench, allowing users to:
+The export bundle can be used to:
 
 * Save an intermediate analysis state
-* Continue an analysis later
 * Transfer an analysis between environments
-* Preserve multiple intermediate AnnData objects and associated analysis state
+* Preserve multiple selected AnnData objects and associated parameters
 
 The ZIP-based format is intentionally used rather than Python object serialization so that the session data remains inspectable and portable.
 
-> **Note:** BioWorkbench session bundles are intended for BioWorkbench workflows. For interoperability with other tools, `.h5ad` remains the preferred data-exchange format.
+> **Note:** For interoperability with other tools, `.h5ad` remains the preferred data-exchange format.
 
 ---
 
@@ -330,7 +329,7 @@ Spatial coordinates are standardized internally through:
 adata.obsm["spatial"]
 ```
 
-Input requirements may evolve as additional spatial technologies are introduced.
+The current spatial workflow is configured for MERFISH. The input must include `center_x` and `center_y` in `adata.obs`; blank-probe genes are identified by names beginning with `Blank-`. Spatial QC plots also use the cell `volume` metadata column. Input requirements may evolve as additional spatial technologies are introduced.
 
 ---
 
@@ -374,7 +373,7 @@ The current beta focuses on:
 * Gene and module-score visualization
 * Spatial visualization
 * Spatial-domain exploration
-* Export and session reload
+* Exporting selected parameters and AnnData objects
 
 ## Who is this for?
 
@@ -465,10 +464,10 @@ pip install -r requirements.txt
 Start the Streamlit application:
 
 ```bash
-streamlit run app.py --server.maxUploadSize <size-in-mb> 
+streamlit run app.py --server.maxUploadSize=500
 ```
 
-The application will open in your browser.
+The application will be available at `http://localhost:8501`. The upload widget currently limits individual `.h5ad` uploads to 500 MB. When changing the Streamlit server upload limit, note that the widget also has its own limit.
 
 Upload an `.h5ad` dataset through the application to begin the analysis workflow.
 
@@ -484,13 +483,13 @@ Build the image:
 docker build -t bioworkbench .
 ```
 
-Run the application:
+Run the application (the container listens on port 8501):
 
 ```bash
 docker run --rm -p 8501:8501 bioworkbench
 ```
 
-Then open:
+The image runs as an unprivileged user and includes a health check. Then open:
 
 ```text
 http://localhost:8501
@@ -522,7 +521,7 @@ Run a specific test:
 python -m pytest tests/<test_file>.py -k "<test_name>"
 ```
 
-The test suite validates the reusable analysis workflow, dataset preparation and export, visualizations, and application startup while minimizing dependence on large biological datasets.
+The test suite validates reusable analysis workflows, dataset preparation and export, plotting behavior, and Streamlit application startup, including checks that workflow pages handle missing prerequisites. Tests use small synthetic datasets rather than large biological samples.
 
 When modifying computational functionality, corresponding tests should be added or updated where appropriate.
 
@@ -540,7 +539,7 @@ BioWorkbench/
 │   ├── 02_clustering.py           # PCA, UMAP, clustering, spatial domains
 │   ├── 03_annotation.py            # Cell-type annotation
 │   ├── 04_visualization.py        # Gene/module visualization
-│   └── 05_download.py             # Export and session management
+│   └── 05_download.py             # Parameter and AnnData export
 │
 ├── src/
 │   ├── filtering.py               # Filtering and doublet detection
@@ -621,7 +620,7 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [x] Spatial-domain identification
 * [x] Spatially variable gene analysis
 * [x] Transcript-level visualization
-* [x] ZIP-based session export and reload
+* [x] ZIP-based export of selected parameters and AnnData objects
 * [x] Automated tests
 * [x] Containerized execution
 
@@ -632,6 +631,7 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [ ] Expanded spatial data validation
 * [ ] More robust annotation workflows
 * [ ] Additional spatial visualization capabilities
+* [ ] Reload BioWorkbench `.wkb` export bundles
 * [ ] Improved reproducibility and configuration management
 * [ ] Expanded documentation
 * [ ] Continuous integration
