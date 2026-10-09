@@ -49,6 +49,26 @@ def test_missing_embedding_raises(small_adata):
         interactive.interactive_plot(small_adata, "umap", color_by=small_adata.obs.columns[0])
 
 
+@pytest.mark.parametrize(
+    "n, first",
+    [(2, "Accent"), (4, "Accent"), (5, "Dark2"), (8, "Dark2"), (9, "tab10"),
+     (10, "tab10"), (11, "tab20"), (20, "tab20")],
+)
+def test_categorical_palette_by_category_count(n, first):
+    import matplotlib
+    from matplotlib.colors import to_hex
+
+    colors = interactive.categorical_palette(n)
+    assert len(colors) == n == len(set(colors))
+    assert colors[0] == to_hex(matplotlib.colormaps[first](0))
+
+
+@pytest.mark.parametrize("n", [21, 60, 61, 150])
+def test_categorical_palette_adapts_to_many_categories(n):
+    colors = interactive.categorical_palette(n)
+    assert len(colors) == n == len(set(colors))
+
+
 def test_group_statistics(adata):
     stats = interactive.group_statistics(adata, "group", groups=["A", "B"])
     assert list(stats["group"]) == ["A", "B"]

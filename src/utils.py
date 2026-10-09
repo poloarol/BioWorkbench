@@ -2,6 +2,7 @@
 import scanpy as sc
 import squidpy as sq
 import numpy as np
+import pandas as pd
 
 _EXCLUDED_COLOR_COLUMNS = {"_cell_id", "cellid"}
 _EXCLUDED_COLOR_PREFIXES = ("center_", "polygon_center_")
@@ -43,34 +44,74 @@ def load_data(filepath: str,
 
     if genes is None and cell_columns is None:
         adata = sc.read(filepath)
+        if is_spatial:
+            validate_spatial_adata(adata)
         _calculate_qc_metrics(adata, is_spatial=is_spatial)
         adata.layers['raw'] = adata.X.copy()
         
         if is_spatial:
-            blank_genes = adata.var_names[adata.var_names.str.startswith("Blank-")].tolist()
-            blank_counts = adata[:, blank_genes].X.sum(axis=1)
-            adata.obs["blank_counts"] = blank_counts
-            adata.obs["pct_counts_blank"] = (
-                adata.obs["blank_counts"] / adata.obs["total_counts"]
-            ) * 100
-            adata.obsm["spatial"] = adata.obs[["center_x", "center_y"]].to_numpy()
+            _add_spatial_qc(adata)
     else:
         adata = sc.read(filepath, backed='r')
         obs_index = slice(None) if cell_columns is None else cell_columns
         var_index = slice(None) if genes is None else genes
         sdata = adata[obs_index, var_index].to_memory()
+        if is_spatial:
+            validate_spatial_adata(sdata)
         _calculate_qc_metrics(sdata, is_spatial=is_spatial)
         sdata.layers['raw'] = sdata.X.copy()
         if is_spatial:
-            blank_genes = sdata.var_names[sdata.var_names.str.startswith("Blank-")].tolist()
-            blank_counts = sdata[:, blank_genes].X.sum(axis=1)
-            sdata.obs["blank_counts"] = blank_counts
-            sdata.obs["pct_counts_blank"] = (
-                sdata.obs["blank_counts"] / sdata.obs["total_counts"]
-            ) * 100
-            sdata.obsm["spatial"] = sdata.obs[["center_x", "center_y"]].to_numpy()
+            _add_spatial_qc(sdata)
     
     return {'raw': adata, 'subset': sdata}
+
+
+def validate_spatial_adata(adata: sc.AnnData) -> None:
+    """Raise a ValueError with an actionable message if a spatial dataset is unusable."""
+
+    if adata.n_obs == 0 or adata.n_vars == 0:
+        raise ValueError("The dataset is empty (no cells or no genes).")
+
+    missing = [c for c in ("center_x", "center_y") if c not in adata.obs.columns]
+    if missing:
+        raise ValueError(
+            f"Spatial datasets require {', '.join(missing)} in adata.obs "
+            "(cell centre coordinates). Add them or select the single-cell technology."
+        )
+
+    for column in ("center_x", "center_y"):
+        if not pd.api.types.is_numeric_dtype(adata.obs[column]):
+            raise ValueError(f"adata.obs['{column}'] must be numeric.")
+        if not np.isfinite(adata.obs[column].to_numpy(dtype=float)).all():
+            raise ValueError(
+                f"adata.obs['{column}'] contains missing or non-finite values."
+            )
+
+    if not adata.var_names.str.startswith("Blank-").any():
+        raise ValueError(
+            "No blank genes found. MERFISH blank probes must be named with the "
+            "'Blank-' prefix."
+        )
+
+    if np.asarray(adata.X.sum(axis=1)).ravel().max() <= 0:
+        raise ValueError("All cells have zero total counts.")
+
+
+def _add_spatial_qc(adata: sc.AnnData) -> None:
+    """Add blank-count QC columns and the spatial embedding to a validated dataset."""
+
+    blank_mask = adata.var_names.str.startswith("Blank-")
+    blank_counts = np.asarray(adata[:, blank_mask].X.sum(axis=1)).ravel()
+    total = adata.obs["total_counts"].to_numpy(dtype=float)
+    adata.obs["blank_counts"] = blank_counts
+    # Cells without counts have no defined blank fraction; report 0 rather than NaN.
+    adata.obs["pct_counts_blank"] = np.divide(
+        blank_counts * 100.0,
+        total,
+        out=np.zeros_like(total),
+        where=total > 0,
+    )
+    adata.obsm["spatial"] = adata.obs[["center_x", "center_y"]].to_numpy(dtype=float)
 
 # def load_data(
 #     filepath: str,

@@ -9,7 +9,65 @@ from src.utils import (
     get_spatially_variable_genes,
     load_data,
     write_to_disk,
+    validate_spatial_adata,
 )
+
+
+def _spatial_adata(**overrides):
+    adata = sc.AnnData(
+        X=np.array([[2, 1, 1], [4, 0, 2]], dtype=float),
+        obs={"center_x": [1.0, 2.0], "center_y": [3.0, 4.0]},
+    )
+    adata.var_names = ["GeneA", "Blank-1", "GeneB"]
+    for column, values in overrides.items():
+        adata.obs[column] = values
+    return adata
+
+
+def test_validate_spatial_adata_accepts_valid_data():
+    validate_spatial_adata(_spatial_adata())
+
+
+def test_validate_spatial_adata_requires_coordinates():
+    adata = _spatial_adata()
+    del adata.obs["center_y"]
+    with pytest.raises(ValueError, match="center_y"):
+        validate_spatial_adata(adata)
+
+
+def test_validate_spatial_adata_rejects_non_finite_coordinates():
+    with pytest.raises(ValueError, match="non-finite"):
+        validate_spatial_adata(_spatial_adata(center_x=[1.0, np.nan]))
+
+
+def test_validate_spatial_adata_rejects_non_numeric_coordinates():
+    with pytest.raises(ValueError, match="numeric"):
+        validate_spatial_adata(_spatial_adata(center_x=["a", "b"]))
+
+
+def test_validate_spatial_adata_requires_blank_genes():
+    adata = _spatial_adata()
+    adata.var_names = ["GeneA", "GeneC", "GeneB"]
+    with pytest.raises(ValueError, match="Blank-"):
+        validate_spatial_adata(adata)
+
+
+def test_validate_spatial_adata_rejects_all_zero_counts():
+    adata = _spatial_adata()
+    adata.X = np.zeros((2, 3))
+    with pytest.raises(ValueError, match="zero total counts"):
+        validate_spatial_adata(adata)
+
+
+def test_load_data_handles_zero_count_cells(tmp_path):
+    adata = _spatial_adata()
+    adata.X = np.array([[2, 1, 1], [0, 0, 0]], dtype=float)
+    filepath = tmp_path / "zero.h5ad"
+    adata.write_h5ad(filepath)
+
+    loaded = load_data(str(filepath), is_spatial=True)["raw"]
+
+    assert loaded.obs["pct_counts_blank"].tolist() == pytest.approx([25.0, 0.0])
 
 
 def test_calculate_qc_metrics_for_single_cell_data(small_adata):

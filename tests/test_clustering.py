@@ -82,7 +82,8 @@ def test_run_pca_passes_n_comps(small_adata):
 
         mock_pca.assert_called_once_with(
             small_adata,
-            n_comps=3
+            n_comps=3,
+            random_state=0
         )
 
     assert result is small_adata
@@ -113,12 +114,14 @@ def test_run_umap_passes_parameters(small_adata):
 
     mock_neighbors.assert_called_once_with(
         small_adata,
-        n_neighbors=7
+        n_neighbors=7,
+        random_state=0
     )
 
     mock_umap.assert_called_once_with(
         small_adata,
-        min_dist=0.2
+        min_dist=0.2,
+        random_state=0
     )
 
     assert result is small_adata
@@ -172,7 +175,8 @@ def test_run_clustering_passes_resolution(small_adata):
 
     mock_leiden.assert_called_once_with(
         small_adata,
-        resolution=0.5
+        resolution=0.5,
+        random_state=0
     )
 
     assert result is small_adata
@@ -243,6 +247,19 @@ def test_run_pca_uses_default_parameters(small_adata):
     assert result is small_adata
 
 
+def test_run_pca_on_copy_leaves_source_untouched(small_adata):
+    small_adata.layers["raw"] = small_adata.X.copy()
+    before = small_adata.X.copy()
+    working = small_adata.copy()
+
+    run_pca(working, n_top_genes=3, n_comps=2)
+
+    assert "X_pca" in working.obsm
+    assert "X_pca" not in small_adata.obsm
+    assert np.array_equal(small_adata.X, before)
+    assert np.array_equal(working.layers["raw"], before)
+
+
 def test_run_pca_repeat_uses_original_counts(small_adata):
     original_counts = small_adata.X.copy()
 
@@ -300,7 +317,7 @@ def test_identify_spatial_domains(small_adata):
             alpha=0.2
         )
 
-    mock_neighbors.assert_called_once_with(small_adata)
+    mock_neighbors.assert_called_once_with(small_adata, random_state=0)
     mock_spatial.assert_called_once_with(small_adata)
     mock_leiden.assert_called_once()
 

@@ -7,7 +7,7 @@ import streamlit as st
 if "is_spatial" not in st.session_state:
     st.session_state["is_spatial"] = False
 
-from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains
+from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains, RANDOM_STATE
 from src.interactive import render_interactive
 from src.utils import color_options
 
@@ -88,11 +88,25 @@ filtered_key = (
     if st.session_state.get("is_spatial", False)
     else "filtered_wout_doublets"
 )
-adata = st.session_state.get("adatas", {}).get(filtered_key)
+filtered = st.session_state.get("adatas", {}).get(filtered_key)
 
-if adata is None:
+if filtered is None:
     st.info("Apply filtering on the Cell and Gene Filtering page first.")
     st.stop()
+
+# Downstream steps modify AnnData in place, so work on a copy that is rebuilt
+# whenever the filtered object changes. Raw counts stay in layers["raw"].
+work = st.session_state.get("clustering_work")
+if work is None or st.session_state.get("clustering_source") is not filtered:
+    restored = st.session_state.get("adatas", {}).get("clustered")
+    if restored is not None and st.session_state.get("clustering_source") is None:
+        work = restored
+    else:
+        work = filtered.copy()
+    st.session_state["clustering_work"] = work
+    st.session_state["clustering_source"] = filtered
+
+adata = work
 
 if st.session_state.get("is_spatial", False):
     col1, col2, col3 = st.columns(3)
@@ -224,6 +238,10 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                 st.info("Run UMAP Clustering and Spatial Domain analysis first.")
             else:
                 st.subheader("Spatial")
+                st.caption(
+                    "Spatial domains are exploratory clusters from a joint "
+                    "expression/spatial graph, not validated biological compartments."
+                )
                 color_by = st.selectbox(
                     "Color cells by",
                     options=color_options(adata),
@@ -393,6 +411,18 @@ st.session_state.params['n_comps'] = n_comps
 st.session_state.params['n_neighbors'] = n_neighbors
 st.session_state.params['resolution'] = resolution
 st.session_state.params['min_dist'] = min_dist
-st.session_state.params['alpha'] = alpha
+st.session_state.params['random_state'] = RANDOM_STATE
+if st.session_state['is_spatial']:
+    st.session_state.params['alpha'] = alpha
 
-st.session_state.adatas['clustered'] = adata
+st.session_state["clustering_work"] = adata
+
+# Annotation requires a complete embedding and clustering, not just a started run.
+if (
+    "X_pca" in adata.obsm
+    and "X_umap" in adata.obsm
+    and "cluster_label" in adata.obs
+):
+    st.session_state.adatas['clustered'] = adata
+else:
+    st.session_state.adatas.pop('clustered', None)

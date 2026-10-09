@@ -15,8 +15,12 @@ if "is_spatial" not in st.session_state:
 adatas = st.session_state.get("adatas", {})
 adata = adatas.get("clustered") if isinstance(adatas, dict) else None
 
-if adata is None:
-    st.info("Run PCA and clustering on the Clustering page before annotation.")
+if adata is None or not (
+    "X_pca" in adata.obsm
+    and "X_umap" in adata.obsm
+    and "cluster_label" in adata.obs
+):
+    st.info("Run PCA and UMAP + Leiden on the Clustering page before annotation.")
     st.stop()
 
 

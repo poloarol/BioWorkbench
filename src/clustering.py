@@ -4,6 +4,8 @@ import seaborn as sns
 import squidpy as sq
 import matplotlib.pyplot as plt
 
+RANDOM_STATE = 0
+
 
 def _normalize_and_log_transform(adata: sc.AnnData) -> sc.AnnData:
     """
@@ -57,7 +59,7 @@ def _run_pca(adata: sc.AnnData, n_comps: int = 50) -> sc.AnnData:
         The AnnData object with PCA embeddings.
     """
 
-    sc.pp.pca(adata, n_comps=n_comps)
+    sc.pp.pca(adata, n_comps=n_comps, random_state=RANDOM_STATE)
 
     return adata
 
@@ -83,6 +85,14 @@ def run_pca(adata: sc.AnnData, n_top_genes: int = 2000, n_comps: int = 50) -> sc
     else:
         adata.X = adata.layers["raw"].copy()
 
+    # Results from a previous run no longer match the new embedding.
+    for key in ("X_umap",):
+        adata.obsm.pop(key, None)
+    for column in ("leiden", "cluster_label"):
+        if column in adata.obs:
+            del adata.obs[column]
+    adata.uns.pop("rank_genes_groups", None)
+
     adata = _normalize_and_log_transform(adata)
     adata = _identify_highly_variable_genes(adata, n_top_genes=n_top_genes)
     adata = _run_pca(adata, n_comps=n_comps)
@@ -106,8 +116,8 @@ def _run_umap(adata: sc.AnnData, n_neighbors: int = 15, min_dist: float = 0.1) -
         The AnnData object with UMAP embeddings.
     """
 
-    sc.pp.neighbors(adata, n_neighbors=n_neighbors)
-    sc.tl.umap(adata, min_dist=min_dist)
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, random_state=RANDOM_STATE)
+    sc.tl.umap(adata, min_dist=min_dist, random_state=RANDOM_STATE)
 
     return adata
 
@@ -126,7 +136,7 @@ def _run_clustering(adata: sc.AnnData, resolution: float = 1.0) -> sc.AnnData:
         The AnnData object with cluster labels.
     """
 
-    sc.tl.leiden(adata, resolution=resolution)
+    sc.tl.leiden(adata, resolution=resolution, random_state=RANDOM_STATE)
 
     return adata
 
@@ -181,14 +191,14 @@ def identify_marker_genes(adata: sc.AnnData, groupby: str = "cluster_label") -> 
 
 def identify_spatial_domains(adata: sc.AnnData, alpha: float = 0.2) -> sc.AnnData:
     """
-    Identify spatial domains in an AnnData object using the Banksy algorithm.
+    Identify exploratory spatial domains by clustering a joint expression/spatial graph.
 
     Parameters:
     - adata: sc.AnnData
         The AnnData object containing spatial gene expression data.
     - alpha: float, optional
-        Relative weight of the first graph in the joint graph. The second graph
-        is weighted by ``1 - alpha``; 0.5 gives both graphs equal importance.
+        Weight of the spatial-proximity graph in the joint graph. The
+        expression (PCA neighbour) graph is weighted by ``1 - alpha``.
 
 
     Returns:
@@ -197,7 +207,7 @@ def identify_spatial_domains(adata: sc.AnnData, alpha: float = 0.2) -> sc.AnnDat
     """
 
     # nearest neighbor graph
-    sc.pp.neighbors(adata)
+    sc.pp.neighbors(adata, random_state=RANDOM_STATE)
     nn_graph_genes = adata.obsp["connectivities"]
 
     # spatial proximity graph
@@ -205,7 +215,12 @@ def identify_spatial_domains(adata: sc.AnnData, alpha: float = 0.2) -> sc.AnnDat
     nn_graph_space = adata.obsp["spatial_connectivities"]
     
     joint_graph = (1 - alpha) * nn_graph_genes + alpha * nn_graph_space
-    sc.tl.leiden(adata, adjacency=joint_graph, key_added="squidpy_domains")
+    sc.tl.leiden(
+        adata,
+        adjacency=joint_graph,
+        key_added="squidpy_domains",
+        random_state=RANDOM_STATE,
+    )
     
     # adata.obs['squidpy_domains'] = 'Domain' + adata.obs['squidpy_domains'].astype(str)
     

@@ -1,9 +1,11 @@
 """Interactive (Plotly) embeddings with group selection and statistics."""
 
+import matplotlib
+import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import seaborn as sns
 
 DIM_COLOR = "rgba(200,200,200,0.25)"
 # Plot height follows the viewport; width already follows the column.
@@ -17,6 +19,39 @@ div[data-testid="stPlotlyChart"] .plot-container {
 </style>
 """
 QC_COLUMNS = ("total_counts", "n_genes_by_counts", "pct_counts_mt", "volume")
+
+
+def categorical_palette(n: int) -> list:
+    """Hex colors for `n` categories, with the palette chosen by category count.
+
+    n < 5: Accent, n < 9: Dark2, n < 11: tab10, n < 21: tab20. Above that the
+    palette adapts: tab20/tab20b/tab20c are chained (up to 60 colors), and
+    beyond that evenly spaced perceptually uniform HUSL hues are generated.
+    """
+    if n < 5:
+        name = "Accent"
+    elif n < 9:
+        name = "Dark2"
+    elif n < 11:
+        name = "tab10"
+    elif n < 21:
+        name = "tab20"
+    else:
+        name = None
+
+    if name is not None:
+        cmap = matplotlib.colormaps[name]
+        return [mcolors.to_hex(cmap(i)) for i in range(n)]
+
+    if n <= 60:
+        colors = [
+            mcolors.to_hex(matplotlib.colormaps[c](i))
+            for c in ("tab20", "tab20b", "tab20c")
+            for i in range(20)
+        ]
+        return colors[:n]
+
+    return [mcolors.to_hex(c) for c in sns.husl_palette(n, s=0.75, l=0.55)]
 
 
 def is_categorical(values: pd.Series) -> bool:
@@ -131,7 +166,7 @@ def interactive_plot(
             categories = values.astype("category")
             category_names = [str(c) for c in categories.cat.categories]
             labels = categories.astype(str).to_numpy()
-            palette = px.colors.qualitative.Alphabet + px.colors.qualitative.Dark24
+            palette = categorical_palette(len(category_names))
             highlight = {str(h) for h in (highlight or [])}
             for i, name in enumerate(category_names):
                 mask = labels == name

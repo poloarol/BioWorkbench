@@ -99,6 +99,7 @@ def clear_downstream_results():
     if not isinstance(st.session_state.adatas, dict):
         return
     st.session_state.adatas.pop("clustered", None)
+    st.session_state.pop("clustering_work", None)
     st.session_state.adatas.pop("annotated", None)
     st.session_state["module_score"] = []
 
@@ -183,6 +184,8 @@ with st.sidebar:
             )
 
             st.session_state.adatas = imported_adatas
+            st.session_state.pop("clustering_work", None)
+            st.session_state.pop("clustering_source", None)
             st.session_state.params = imported_params
             st.session_state.is_spatial = is_spatial
             saved_technology = imported_params.get("spatial_technology")
@@ -334,13 +337,16 @@ with st.sidebar:
                 st.session_state.loaded_adata_modality = None
                 st.session_state.loaded_adata_signature = None
                 
-                import traceback
+                if isinstance(e, ValueError):
+                    st.error(f"Invalid dataset: {e}")
+                else:
+                    import traceback
 
-                st.error(
-                    f"Error loading .h5ad file: "
-                    f"{type(e).__name__}: {e}"
-                )
-                st.code(traceback.format_exc())
+                    st.error(
+                        f"Error loading .h5ad file: "
+                        f"{type(e).__name__}: {e}"
+                    )
+                    st.code(traceback.format_exc())
 
     # if cells_file is not None:
     #     try:
@@ -480,9 +486,12 @@ with st.sidebar:
                         blank_max_percentage=float(blank_threshold)
                     )
 
+                # New filtering results invalidate any analysis built on the old ones.
+                clear_downstream_results()
+
                 if adata_filtered is None:
                     st.error("Filtering returned no data.")
-                    clear_filtered_results()
+                    clear_downstream_results()
 
                 elif adata_filtered.n_obs == 0:
                     st.warning(
@@ -572,7 +581,7 @@ with st.sidebar:
 
             except Exception as e:
                 st.error(f"Error while filtering data: {e}")
-                clear_filtered_results()
+                clear_downstream_results()
 
 
 # ============================================================

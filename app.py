@@ -23,18 +23,29 @@ st.markdown(
             padding: 0;
         }
 
-        /* Sidebar logo: lower, and ~90% of the sidebar width */
+        /* Keep the logo and sidebar toggle together in the sidebar header. */
         [data-testid="stSidebarHeader"] {
-            height: auto;
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             width: 100%;
-            padding: 2.5rem 0 1rem 0;
+            padding: 2.5rem 0 2rem 0;
         }
 
-        [data-testid="stSidebarHeader"] > div,
+        [data-testid="stSidebarHeader"] > div:first-child {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: auto;
+        }
+
+        [data-testid="stSidebarHeader"] > div:last-child {
+            flex: 0 0 auto;
+            width: auto;
+        }
+
         [data-testid="stSidebarHeader"] a {
             display: block;
-            width: 100% !important;
+            width: 100%;
             max-width: 100%;
             height: auto;
         }
@@ -45,11 +56,11 @@ st.markdown(
 
         [data-testid="stSidebarHeader"] img {
             display: block;
-            width: 90cqw !important;
+            width: 70cqw !important;
             height: auto !important;
             max-width: none !important;
             max-height: none !important;
-            margin: 0 0 0 calc((100% - 90cqw) / 2);
+            margin: 2rem auto 1rem;
         }
 
         /* Make the header edge-to-edge */
