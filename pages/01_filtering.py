@@ -152,7 +152,7 @@ with st.sidebar:
         "Upload a BioWorkbench bundle",
         type=["wkb"],
         key="session_bundle_upload",
-        max_upload_size=500,
+        max_upload_size=2000,
     )
     if st.button(
         "Restore bundle",
