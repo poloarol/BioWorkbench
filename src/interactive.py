@@ -6,6 +6,16 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 DIM_COLOR = "rgba(200,200,200,0.25)"
+# Plot height follows the viewport; width already follows the column.
+RESPONSIVE_CSS = """
+<style>
+div[data-testid="stPlotlyChart"],
+div[data-testid="stPlotlyChart"] .js-plotly-plot,
+div[data-testid="stPlotlyChart"] .plot-container {
+    height: clamp(340px, 70vh, 900px) !important;
+}
+</style>
+"""
 QC_COLUMNS = ("total_counts", "n_genes_by_counts", "pct_counts_mt", "volume")
 
 
@@ -64,7 +74,7 @@ def interactive_plot(
     gene: str = None,
     highlight=None,
     point_size: float = None,
-    height: int = 600,
+    height: int = None,
 ) -> go.Figure:
     """Zoomable/pannable scatter of cells colored by an obs column or a gene.
 
@@ -76,7 +86,7 @@ def interactive_plot(
         highlight: Categories of a categorical `color_by` to emphasise; all
             other cells are dimmed. None or empty shows everything.
         point_size: Marker size; chosen from the cell count when None.
-        height: Figure height in pixels.
+        height: Fixed figure height in pixels; None (default) sizes to the viewport.
 
     Every point carries its integer row position in `customdata`, so selections
     made in the browser can be mapped back to cells.
@@ -265,7 +275,7 @@ def render_interactive(
     color_by: str = None,
     gene: str = None,
     group_by: str = None,
-    height: int = 600,
+    height: int = None,
 ) -> None:
     """Render an interactive plot with a group picker and statistics in Streamlit.
 
@@ -278,6 +288,8 @@ def render_interactive(
     restricts the plot to those cells.
     """
     import streamlit as st
+
+    st.html(RESPONSIVE_CSS)
 
     if color_by is not None and is_categorical(adata.obs[color_by]):
         group_col = color_by

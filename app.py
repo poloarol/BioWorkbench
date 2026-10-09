@@ -8,6 +8,12 @@ st.set_page_config(
     layout="wide",
 )
 
+st.logo(
+    "docs/images/bioworkbench-logo.png",
+    icon_image="docs/images/bioworkbench-logo-small.png",
+    size="large",
+)
+
 # Remove Streamlit's default content width/padding
 st.markdown(
     """
@@ -15,6 +21,35 @@ st.markdown(
         .stAppViewContainer .main .block-container {
             max-width: 100%;
             padding: 0;
+        }
+
+        /* Sidebar logo: lower, and ~90% of the sidebar width */
+        [data-testid="stSidebarHeader"] {
+            height: auto;
+            display: block;
+            width: 100%;
+            padding: 2.5rem 0 1rem 0;
+        }
+
+        [data-testid="stSidebarHeader"] > div,
+        [data-testid="stSidebarHeader"] a {
+            display: block;
+            width: 100% !important;
+            max-width: 100%;
+            height: auto;
+        }
+
+        [data-testid="stSidebar"] {
+            container-type: inline-size;
+        }
+
+        [data-testid="stSidebarHeader"] img {
+            display: block;
+            width: 90cqw !important;
+            height: auto !important;
+            max-width: none !important;
+            max-height: none !important;
+            margin: 0 0 0 calc((100% - 90cqw) / 2);
         }
 
         /* Make the header edge-to-edge */

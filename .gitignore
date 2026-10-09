@@ -8,3 +8,4 @@
 src/__pycache__/**/*
 
 /.pytest_cache
+/pages/__pycache__
