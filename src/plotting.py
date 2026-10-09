@@ -6,6 +6,10 @@ import squidpy as sq
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+# Shared sizes so plots displayed side by side line up.
+SINGLE_FIGSIZE = (8, 6)
+WIDE_FIGSIZE = (18, 6)
+
 
 def highest_expressed_genes(adata: sc.AnnData, n_top_genes: int = 10) -> plt.Figure:
     """
@@ -21,7 +25,7 @@ def highest_expressed_genes(adata: sc.AnnData, n_top_genes: int = 10) -> plt.Fig
         The matplotlib figure object containing the plot.
     """
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=SINGLE_FIGSIZE)
 
     sc.pl.highest_expr_genes(
         adata,
@@ -53,7 +57,7 @@ def plot_qc_metrics(
     """
 
     if is_spatial:
-        fig, axs = plt.subplots(1, 3, figsize=(10, 4))
+        fig, axs = plt.subplots(1, 3, figsize=WIDE_FIGSIZE)
 
         axs[0].set_title("Total transcripts per cell")
         sns.histplot(
@@ -99,6 +103,7 @@ def plot_qc_metrics(
     )
 
     fig = plt.gcf()
+    fig.set_size_inches(*WIDE_FIGSIZE)
     fig.tight_layout()
     return fig
 
@@ -125,7 +130,7 @@ def plot_pca(
 ):
     """Plot the first two principal components."""
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=SINGLE_FIGSIZE)
 
     values = adata.obs[color_by]
 
@@ -196,14 +201,15 @@ def plot_pca(
 def plot_spatial(
     adata,
     color_by,
-    figsize=(18, 6),
+    figsize=None,
 ):
     """Plot spatial representation of the data.
 
     Args:
         adata (sc.AnnData): Annotated data matrix.
         color_by (str or list of str): Column(s) in `adata.obs` to color the points by.
-        figsize (tuple, optional): Figure size. Defaults to (18, 6).
+        figsize (tuple, optional): Figure size. Defaults to SINGLE_FIGSIZE for
+            one panel and WIDE_FIGSIZE for several.
 
     Returns:
         matplotlib.figure.Figure: The resulting figure.
@@ -212,6 +218,9 @@ def plot_spatial(
         color_by = [color_by]
 
     n_plots = len(color_by)
+
+    if figsize is None:
+        figsize = SINGLE_FIGSIZE if n_plots == 1 else WIDE_FIGSIZE
 
     fig, axes = plt.subplots(
         1,
@@ -322,13 +331,13 @@ def plot_spatial(
 def plot_umap(
     adata: sc.AnnData,
     color_by: str,
-    figsize: tuple = (8, 6),
+    figsize: tuple = SINGLE_FIGSIZE,
 ):
     """Plot UMAP colored by a categorical or continuous obs column.
     Args:
         adata (sc.AnnData): Annotated data matrix.
         color_by (str): Column in `adata.obs` to color the points by.
-        figsize (tuple, optional): Figure size. Defaults to (8, 6).
+        figsize (tuple, optional): Figure size. Defaults to SINGLE_FIGSIZE.
 
     Returns:
         matplotlib.figure.Figure: The resulting figure.
@@ -420,7 +429,7 @@ def plot_umap(
 def plot_umap_genes(
     adata,
     genes,
-    figsize=(8, 6),
+    figsize=SINGLE_FIGSIZE,
 ):
     """Plot UMAP expression of multiple genes.
 
@@ -428,7 +437,7 @@ def plot_umap_genes(
         adata (sc.AnnData): Annotated data matrix containing UMAP
             coordinates in `adata.obsm["X_umap"]`.
         genes (list[str]): List of gene names to plot.
-        figsize (tuple, optional): Base figure size. Defaults to (8, 6).
+        figsize (tuple, optional): Base figure size. Defaults to SINGLE_FIGSIZE.
 
     Returns:
         matplotlib.figure.Figure: The resulting figure.
@@ -514,7 +523,7 @@ def plot_umap_genes(
 def plot_spatial_genes(
     adata,
     genes,
-    figsize=(8, 6),
+    figsize=SINGLE_FIGSIZE,
 ):
     """Plot spatial expression of multiple genes.
 
@@ -523,7 +532,7 @@ def plot_spatial_genes(
             coordinates in `adata.obs["center_x"]` and
             `adata.obs["center_y"]`.
         genes (list[str]): List of gene names to plot.
-        figsize (tuple, optional): Base figure size. Defaults to (8, 6).
+        figsize (tuple, optional): Base figure size. Defaults to SINGLE_FIGSIZE.
 
     Returns:
         matplotlib.figure.Figure: The resulting figure.

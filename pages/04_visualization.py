@@ -1,7 +1,7 @@
 import streamlit as st
 
 from src.utils import calculate_module_score
-from src.plotting import plot_umap, plot_spatial, plot_spatial_genes, plot_umap_genes
+from src.interactive import render_interactive, is_categorical
 
 if "is_spatial" not in st.session_state:
     st.session_state["is_spatial"] = False
@@ -81,37 +81,28 @@ color_by = st.selectbox(
     key="gene_exp",
 )
 
+group_options = [
+    column
+    for column in adata.obs.columns
+    if is_categorical(adata.obs[column]) and 1 < adata.obs[column].nunique() <= 100
+]
+group_by = st.selectbox(
+    "Group cells by (for statistics / filtering)",
+    options=group_options,
+    index=None,
+    key="gene_group_by",
+    placeholder="Optional: cluster, domain, annotation...",
+)
+
 if st.session_state['is_spatial']:
     col1, col2 = st.columns(2)
-    
+
     with col1:
-        st.pyplot(
-            plot_umap_genes(
-                adata,
-                genes=color_by,
-                figsize=(12, 10),
-            )
-        )
+        render_interactive(adata, "umap", key="gene_umap", gene=color_by, group_by=group_by)
     with col2:
-        st.pyplot(
-            plot_spatial_genes(
-                adata,
-                genes=color_by,
-                figsize=(12, 10),
-            )
-        )
-    
+        render_interactive(adata, "spatial", key="gene_spatial", gene=color_by, group_by=group_by)
 else:
-    col1 = st.columns(1)[0]
-    
-    with col1:
-        st.pyplot(
-            plot_umap_genes(
-                adata,
-                genes=color_by,
-                figsize=(12, 10),
-            )
-        )
+    render_interactive(adata, "umap", key="gene_umap", gene=color_by, group_by=group_by)
 
 st.divider()
 
@@ -139,27 +130,9 @@ else:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.pyplot(
-                plot_umap(
-                    adata,
-                    color_by=color_by,
-                    figsize=(12, 10),
-                )
-            )
+            render_interactive(adata, "umap", key="module_umap", color_by=color_by)
 
         with col2:
-            st.pyplot(
-                plot_spatial(
-                    adata,
-                    color_by=color_by,
-                    figsize=(12, 10),
-                )
-            )
+            render_interactive(adata, "spatial", key="module_spatial", color_by=color_by)
     else:
-        st.pyplot(
-            plot_umap(
-                adata,
-                color_by=color_by,
-                figsize=(12, 10),
-            )
-        )
+        render_interactive(adata, "umap", key="module_umap", color_by=color_by)

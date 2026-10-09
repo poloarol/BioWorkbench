@@ -6,7 +6,7 @@ import streamlit as st
 from celltypist import models
 from matplotlib import pyplot as plt
 
-from src.plotting import plot_umap, plot_spatial
+from src.interactive import render_interactive
 
 if "is_spatial" not in st.session_state:
     st.session_state["is_spatial"] = False
@@ -165,42 +165,18 @@ if "X_umap" in adata.obsm and available_annotations:
             plot_cols = st.columns(2)
 
             with plot_cols[0]:
-                fig = plot_umap(
-                    adata,
-                    color_by=color_by,
+                render_interactive(
+                    adata, "umap", key=f"ann_umap_{color_by}", color_by=color_by
                 )
-
-                st.pyplot(
-                    fig,
-                    use_container_width=True,
-                )
-
-                plt.close(fig)
 
             with plot_cols[1]:
-                fig = plot_spatial(
-                    adata,
-                    color_by=color_by,
+                render_interactive(
+                    adata, "spatial", key=f"ann_spatial_{color_by}", color_by=color_by
                 )
-
-                st.pyplot(
-                    fig,
-                    use_container_width=True,
-                )
-
-                plt.close(fig)
 
         else:
-            fig = plot_umap(
-                adata,
-                color_by=color_by,
+            render_interactive(
+                adata, "umap", key=f"ann_umap_{color_by}", color_by=color_by
             )
-
-            st.pyplot(
-                fig,
-                use_container_width=True,
-            )
-
-            plt.close(fig)
 
 st.session_state.adatas['annotated'] = adata

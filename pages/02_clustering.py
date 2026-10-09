@@ -8,7 +8,7 @@ if "is_spatial" not in st.session_state:
     st.session_state["is_spatial"] = False
 
 from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains
-from src.plotting import plot_pca, plot_umap, plot_spatial
+from src.interactive import render_interactive
 from src.utils import color_options
 
 
@@ -191,17 +191,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                 key="pca_color_by",
             )
 
-            fig = plot_pca(
-                adata,
-                color_by=pca_color_by,
-            )
-
-            st.pyplot(
-                fig,
-                use_container_width=True,
-            )
-
-            plt.close(fig)
+            render_interactive(adata, "pca", key="pca", color_by=pca_color_by)
 
         else:
             st.info("PCA has not been run yet.")
@@ -222,19 +212,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                 key="umap_color_by",
             )
 
-            fig = plot_umap(
-                adata,
-                color_by=umap_color_by,
-            )
-            
-            print(adata.obs.columns)
-
-            st.pyplot(
-                fig,
-                use_container_width=True,
-            )
-
-            plt.close(fig)
+            render_interactive(adata, "umap", key="umap", color_by=umap_color_by)
 
         else:
             st.info("UMAP has not been run yet.")
@@ -253,12 +231,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                     key="spatial_color_by",
                 )
             
-                fig = plot_spatial(
-                    adata,
-                    color_by=color_by
-                )
-
-                st.pyplot(fig)
+                render_interactive(adata, "spatial", key="spatial", color_by=color_by)
 
             # st.dataframe(
             #     domain_counts,
