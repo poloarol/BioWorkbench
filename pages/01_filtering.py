@@ -11,6 +11,7 @@ from plotly.subplots import make_subplots
 
 from src.utils import load_data, get_spatially_variable_genes
 from src.filtering import data_filtering
+from src.interactive import render_interactive
 from src.plotting import (
     highest_expressed_genes,
     plot_qc_metrics,
@@ -761,7 +762,7 @@ if selected == "Top Gene":
             )
             
             if color_by is not None:
-                st.pyplot(plot_spatial_genes(base_adata, genes=[color_by]), use_container_width=True)
+                render_interactive(base_adata, "spatial", key="svg1_map", gene=color_by, height=450)
             else:
                 st.info("No spatially variable genes are available.")
 
@@ -774,7 +775,7 @@ if selected == "Top Gene":
                 placeholder="Select a Spatially Variable Gene"
             )
             if color_by is not None:
-                st.pyplot(plot_spatial_genes(filtered_adata, genes=[color_by]), use_container_width=True)
+                render_interactive(filtered_adata, "spatial", key="svg2_map", gene=color_by, height=450)
             else:
                 st.info("No spatially variable genes are available.")
 
@@ -787,7 +788,7 @@ if selected == "Top Gene":
                 placeholder="Select a Spatially Variable Gene"
             )
             if color_by is not None:
-                st.pyplot(plot_spatial_genes(singlet_adata, genes=[color_by]), use_container_width=True)
+                render_interactive(singlet_adata, "spatial", key="svg3_map", gene=color_by, height=450)
             else:
                 st.info("No spatially variable genes are available.")
 

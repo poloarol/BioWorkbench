@@ -393,3 +393,218 @@ def _summary_row(subset, total: int, gene: str = None) -> dict:
         row[f"{gene} mean (log1p)"] = round(float(expr.mean()), 3)
         row[f"{gene} % expressing"] = round(100 * float((expr > 0).mean()), 2)
     return row
+
+# -----------------------------------------------------------------------------
+# Highly / spatially variable genes
+# -----------------------------------------------------------------------------
+
+HVG_COLOR = "#d95f02"
+BACKGROUND_COLOR = "#b8b8b8"
+SIGNIFICANCE_ALPHA = 0.05
+
+
+def _variability_column(var: pd.DataFrame) -> str:
+    for column in ("dispersions_norm", "variances_norm"):
+        if column in var.columns:
+            return column
+    raise ValueError("No normalized dispersion/variance found in adata.var.")
+
+
+def hvg_table(adata) -> pd.DataFrame:
+    """Highly variable genes ranked by normalized dispersion (best first)."""
+    if "highly_variable" not in adata.var:
+        return pd.DataFrame()
+    column = _variability_column(adata.var)
+    table = adata.var.loc[adata.var["highly_variable"].astype(bool)]
+    table = table.sort_values(column, ascending=False)
+    table.index.name = "gene"
+    return table.reset_index().assign(rank=lambda d: np.arange(1, len(d) + 1))[
+        ["rank", "gene"] + [c for c in table.columns if c != "highly_variable"]
+    ]
+
+
+def hvg_plot(adata, label_top: int = 10, height: int = None) -> go.Figure:
+    """Mean expression vs. normalized dispersion, highlighting the selected HVGs."""
+    if "highly_variable" not in adata.var:
+        raise ValueError("Highly variable genes have not been identified.")
+    column = _variability_column(adata.var)
+    var = adata.var.dropna(subset=["means", column])
+    is_hvg = var["highly_variable"].to_numpy(dtype=bool)
+    hover = "%{text}<br>mean: %{x:.3g}<br>" + column + ": %{y:.3g}<extra></extra>"
+
+    fig = go.Figure()
+    for mask, name, color, size in (
+        (~is_hvg, f"Other genes ({(~is_hvg).sum():,})", BACKGROUND_COLOR, 4),
+        (is_hvg, f"Highly variable ({is_hvg.sum():,})", HVG_COLOR, 6),
+    ):
+        fig.add_trace(
+            go.Scattergl(
+                x=var["means"].to_numpy()[mask],
+                y=var[column].to_numpy()[mask],
+                text=var.index.to_numpy()[mask],
+                mode="markers",
+                name=name,
+                marker=dict(size=size, color=color, opacity=0.8),
+                hovertemplate=hover,
+            )
+        )
+
+    top = var[is_hvg].nlargest(label_top, column)
+    if len(top):
+        fig.add_trace(
+            go.Scatter(
+                x=top["means"],
+                y=top[column],
+                text=top.index,
+                mode="text",
+                textposition="top center",
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
+
+    fig.update_layout(
+        title="Gene variability",
+        xaxis=dict(title="Mean expression (log1p)", type="log"),
+        yaxis=dict(title=column.replace("_", " ")),
+        height=height,
+        margin=dict(l=10, r=10, t=50, b=10),
+        template="plotly_white",
+        dragmode="zoom",
+        legend=dict(orientation="h", y=-0.2),
+    )
+    return fig
+
+
+def svg_table(adata, alpha: float = SIGNIFICANCE_ALPHA) -> pd.DataFrame:
+    """Moran's I results ranked by I, with a significance flag."""
+    if "moranI" not in adata.uns:
+        return pd.DataFrame()
+    table = adata.uns["moranI"].sort_values("I", ascending=False).copy()
+    fdr = table["pval_norm_fdr_bh"] if "pval_norm_fdr_bh" in table else table["pval_norm"]
+    table["significant"] = (fdr < alpha) & (table["I"] > 0)
+    table.index.name = "gene"
+    table = table.reset_index()
+    table.insert(0, "rank", np.arange(1, len(table) + 1))
+    return table
+
+
+def svg_plot(adata, alpha: float = SIGNIFICANCE_ALPHA, label_top: int = 10, height: int = None) -> go.Figure:
+    """Moran's I vs. significance (-log10 FDR) for the tested genes."""
+    table = svg_table(adata, alpha)
+    if table.empty:
+        raise ValueError("Spatially variable genes have not been computed.")
+    fdr_col = "pval_norm_fdr_bh" if "pval_norm_fdr_bh" in table else "pval_norm"
+    table["neg_log10_fdr"] = -np.log10(table[fdr_col].clip(lower=1e-300))
+    sig = table["significant"].to_numpy()
+    hover = "%{text}<br>Moran's I: %{x:.3f}<br>-log10 FDR: %{y:.2f}<extra></extra>"
+
+    fig = go.Figure()
+    for mask, name, color in (
+        (~sig, f"Not significant ({(~sig).sum():,})", BACKGROUND_COLOR),
+        (sig, f"Spatially variable ({sig.sum():,})", HVG_COLOR),
+    ):
+        fig.add_trace(
+            go.Scattergl(
+                x=table["I"].to_numpy()[mask],
+                y=table["neg_log10_fdr"].to_numpy()[mask],
+                text=table["gene"].to_numpy()[mask],
+                mode="markers",
+                name=name,
+                marker=dict(size=6, color=color, opacity=0.8),
+                hovertemplate=hover,
+            )
+        )
+
+    top = table.head(label_top)
+    fig.add_trace(
+        go.Scatter(
+            x=top["I"],
+            y=top["neg_log10_fdr"],
+            text=top["gene"],
+            mode="text",
+            textposition="top center",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_hline(y=-np.log10(alpha), line_dash="dot", line_color="gray")
+    fig.update_layout(
+        title="Spatial autocorrelation (Moran's I)",
+        xaxis=dict(title="Moran's I"),
+        yaxis=dict(title="-log10 adjusted p-value"),
+        height=height,
+        margin=dict(l=10, r=10, t=50, b=10),
+        template="plotly_white",
+        dragmode="zoom",
+        legend=dict(orientation="h", y=-0.2),
+    )
+    return fig
+
+
+def render_hvg(adata, key: str = "hvg") -> None:
+    """Streamlit view of the highly variable genes: plot, ranked table, gene map."""
+    import streamlit as st
+
+    st.html(RESPONSIVE_CSS)
+    table = hvg_table(adata)
+    st.write(f"Selected **{len(table):,}** highly variable genes.")
+    left, right = st.columns([3, 2])
+    with left:
+        st.plotly_chart(
+            hvg_plot(adata),
+            key=f"{key}_plot",
+            config={"scrollZoom": True, "displaylogo": False},
+            width="stretch",
+        )
+    with right:
+        st.dataframe(table, hide_index=True, width="stretch", height=420)
+    _gene_picker(adata, table["gene"].tolist(), key)
+
+
+def render_svg(adata, key: str = "svg", alpha: float = SIGNIFICANCE_ALPHA) -> None:
+    """Streamlit view of the spatially variable genes: plot, ranked table, spatial map."""
+    import streamlit as st
+
+    st.html(RESPONSIVE_CSS)
+    alpha = st.slider(
+        "Adjusted p-value cutoff", 0.001, 0.2, alpha, 0.001, key=f"{key}_alpha", format="%.3f"
+    )
+    table = svg_table(adata, alpha)
+    significant = table[table["significant"]]
+    st.write(
+        f"**{len(significant):,}** of {len(table):,} tested genes are spatially variable "
+        f"(FDR < {alpha:g}, Moran's I > 0)."
+    )
+    left, right = st.columns([3, 2])
+    with left:
+        st.plotly_chart(
+            svg_plot(adata, alpha),
+            key=f"{key}_plot",
+            config={"scrollZoom": True, "displaylogo": False},
+            width="stretch",
+        )
+    with right:
+        st.dataframe(table, hide_index=True, width="stretch", height=420)
+    _gene_picker(adata, significant["gene"].tolist() or table["gene"].tolist(), key, spatial=True)
+
+
+def _gene_picker(adata, genes: list, key: str, spatial: bool = False) -> None:
+    import streamlit as st
+
+    if not genes:
+        return
+    gene = st.selectbox("Visualize a gene", options=genes, key=f"{key}_gene")
+    if gene is None:
+        return
+    has_spatial = {"center_x", "center_y"} <= set(adata.obs.columns)
+    if "X_umap" in adata.obsm and has_spatial and spatial:
+        col1, col2 = st.columns(2)
+        with col1:
+            render_interactive(adata, "spatial", key=f"{key}_map", gene=gene)
+        with col2:
+            render_interactive(adata, "umap", key=f"{key}_umap", gene=gene)
+    elif spatial and has_spatial:
+        render_interactive(adata, "spatial", key=f"{key}_map", gene=gene)
+    elif "X_umap" in adata.obsm:
+        render_interactive(adata, "umap", key=f"{key}_umap", gene=gene)

@@ -7,8 +7,8 @@ import streamlit as st
 if "is_spatial" not in st.session_state:
     st.session_state["is_spatial"] = False
 
-from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains, RANDOM_STATE
-from src.interactive import render_interactive
+from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains, run_spatially_variable_genes, RANDOM_STATE
+from src.interactive import render_interactive, render_hvg, render_svg
 from src.utils import color_options
 
 
@@ -238,10 +238,9 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                 st.info("Run UMAP Clustering and Spatial Domain analysis first.")
             else:
                 st.subheader("Spatial")
-                st.caption(
-                    "Spatial domains are exploratory clusters from a joint "
-                    "expression/spatial graph, not validated biological compartments."
-                )
+                # st.caption(
+                #     "Spatial domains are obtained from a joint expression/spatial graph, not validated biological compartments."
+                # )
                 color_by = st.selectbox(
                     "Color cells by",
                     options=color_options(adata),
@@ -261,23 +260,9 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 # -----------------------------------------------------------------------------
 
 if "highly_variable" in adata.var:
-
     st.divider()
-
     st.subheader("Highly Variable Genes")
-
-    hvg = adata.var[
-        adata.var["highly_variable"]
-    ].copy()
-
-    st.write(
-        f"Selected **{len(hvg):,}** highly variable genes."
-    )
-
-    st.dataframe(
-        hvg,
-        use_container_width=True,
-    )
+    render_hvg(adata, key="hvg")
 
 if 'cluster_label' in adata.obs:
     adata = identify_marker_genes(adata, groupby="cluster_label")

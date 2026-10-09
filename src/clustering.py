@@ -189,6 +189,47 @@ def identify_marker_genes(adata: sc.AnnData, groupby: str = "cluster_label") -> 
     return adata
 
 
+def run_spatially_variable_genes(
+    adata: sc.AnnData,
+    only_highly_variable: bool = True,
+) -> sc.AnnData:
+    """
+    Rank genes by spatial autocorrelation (Moran's I) with Squidpy.
+
+    Results are stored in ``adata.uns["moranI"]`` (columns ``I``,
+    ``pval_norm`` and ``pval_norm_fdr_bh``, indexed by gene).
+
+    Parameters:
+    - adata: sc.AnnData
+        Data with spatial coordinates in ``obsm["spatial"]``.
+    - only_highly_variable: bool, optional
+        Restrict testing to highly variable genes when they are annotated,
+        which is much faster on large panels. Blank probes are always excluded.
+    """
+
+    if "spatial" not in adata.obsm:
+        raise ValueError("Spatial coordinates not found in adata.obsm['spatial'].")
+
+    genes = adata.var_names[~adata.var_names.astype(str).str.contains("Blank-")]
+    if only_highly_variable and "highly_variable" in adata.var:
+        genes = genes[adata.var.loc[genes, "highly_variable"].to_numpy(dtype=bool)]
+    if len(genes) == 0:
+        raise ValueError("No genes available for spatial autocorrelation.")
+
+    if "spatial_connectivities" not in adata.obsp:
+        sq.gr.spatial_neighbors(adata)
+
+    sq.gr.spatial_autocorr(
+        adata,
+        mode="moran",
+        genes=list(genes),
+        corr_method="fdr_bh",
+        n_jobs=1,
+    )
+
+    return adata
+
+
 def identify_spatial_domains(adata: sc.AnnData, alpha: float = 0.2) -> sc.AnnData:
     """
     Identify exploratory spatial domains by clustering a joint expression/spatial graph.

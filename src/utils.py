@@ -256,33 +256,87 @@ def calculate_module_score(
     return adata
 
 
-def get_spatially_variable_genes(adata: sc.AnnData, n_top_genes: int = 2000) -> list[str]:
+def get_spatially_variable_genes(
+    adata: sc.AnnData,
+    n_top_genes: int = 2000,
+) -> list[str]:
     """
-    Identify spatially variable genes in an AnnData object.
+    Identify spatially variable genes using Moran's I in Squidpy.
 
-    Parameters:
-    - adata: sc.AnnData
-        The AnnData object containing the gene expression data.
-    - n_top_genes: int, optional (default=2000)
-        The number of top spatially variable genes to return.
+    Parameters
+    ----------
+    adata
+        AnnData object with spatial coordinates in `obsm["spatial"]`.
+    n_top_genes
+        Maximum number of top spatially autocorrelated genes to return.
 
-    Returns:
-    - list[str]
-        A list of the top spatially variable genes.
+    Returns
+    -------
+    list[str]
+        Gene names ranked by Moran's I, excluding blank probes.
+
+    Notes
+    -----
+    Uses the existing `spatial_connectivities` graph if available.
+    Otherwise, constructs a Delaunay spatial graph.
+
+    This function returns genes ranked by Moran's I, not necessarily
+    statistically significant genes. For inferential use, examine the
+    adjusted p-values in the Squidpy results.
     """
-    sc.pp.highly_variable_genes(
+    if n_top_genes < 1:
+        raise ValueError("n_top_genes must be at least 1.")
+
+    if adata.n_obs < 3:
+        raise ValueError("At least 3 observations are required.")
+
+    if "spatial" not in adata.obsm:
+        raise ValueError(
+            "Spatial coordinates not found in adata.obsm['spatial']."
+        )
+
+    if adata.n_vars == 0:
+        return []
+
+    # Build the spatial graph if it doesn't already exist.
+    if "spatial_connectivities" not in adata.obsp:
+        sq.gr.spatial_neighbors(
+            adata,
+            spatial_key="spatial",
+            coord_type="generic",
+            delaunay=True,
+        )
+
+    # Exclude blank probes before testing.
+    genes = [
+        gene
+        for gene in adata.var_names
+        if "Blank-" not in str(gene)
+    ]
+
+    if not genes:
+        return []
+
+    # Calculate Moran's I and return the results without storing
+    # the result table in adata.uns.
+    results = sq.gr.spatial_autocorr(
         adata,
-        flavor="seurat_v3",
-        n_top_genes=n_top_genes,
-        subset=False,
-        inplace=True,
+        mode="moran",
+        genes=genes,
+        attr="X",
+        corr_method="fdr_bh",
+        copy=True,
+        n_jobs=1,
     )
-    
-    items = adata.var_names[adata.var["highly_variable"]].tolist()
-    items = [x for x in items if "Blank-" not in x]
 
-    
-    return items
+    if results is None or results.empty:
+        return []
+
+    # Rank positive spatial autocorrelation first.
+    results = results.sort_values("I", ascending=False)
+    results = results.loc[results["I"] > 0]
+
+    return results.index[:n_top_genes].astype(str).tolist()
 
 
 # def _prepare_adata(
