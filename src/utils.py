@@ -3,6 +3,20 @@ import scanpy as sc
 import squidpy as sq
 import numpy as np
 
+_EXCLUDED_COLOR_COLUMNS = {"_cell_id", "cellid"}
+_EXCLUDED_COLOR_PREFIXES = ("center_", "polygon_center_")
+
+
+def color_options(adata: sc.AnnData) -> list[str]:
+    """obs columns suitable for coloring, without coordinates/polygon/cell ids."""
+    return [
+        col
+        for col in adata.obs.columns
+        if all(excluded not in str(col).lower() for excluded in _EXCLUDED_COLOR_COLUMNS)
+        and not str(col).lower().startswith(_EXCLUDED_COLOR_PREFIXES)
+    ]
+
+
 def load_data(filepath: str, 
             cell_columns: list[str] = None, 
             genes: list[str] = None,

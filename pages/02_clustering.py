@@ -9,6 +9,7 @@ if "is_spatial" not in st.session_state:
 
 from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains
 from src.plotting import plot_pca, plot_umap, plot_spatial
+from src.utils import color_options
 
 
 # -----------------------------------------------------------------------------
@@ -16,6 +17,7 @@ from src.plotting import plot_pca, plot_umap, plot_spatial
 # -----------------------------------------------------------------------------
 
 alpha = 0.2
+
 
 with st.sidebar:
     st.title("Processing parameters")
@@ -124,6 +126,7 @@ with col1:
 with col2:
     if st.button(
         "▶ Run UMAP + Leiden",
+        type="primary",
         use_container_width=True,
     ):
         if "X_pca" not in adata.obsm:
@@ -147,6 +150,7 @@ if st.session_state['is_spatial']:
     with col3:
         if st.button(
             "▶ Run Identify Spatial Domains",
+            type="primary",
             use_container_width=True,
         ):
             with st.spinner("Running spatial domain identification..."):
@@ -183,7 +187,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 
             pca_color_by = st.selectbox(
                 "Color cells by",
-                options=list(adata.obs.columns),
+                options=color_options(adata),
                 key="pca_color_by",
             )
 
@@ -214,7 +218,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 
             umap_color_by = st.selectbox(
                 "Color cells by",
-                options=list(adata.obs.columns),
+                options=color_options(adata),
                 key="umap_color_by",
             )
 
@@ -222,6 +226,8 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                 adata,
                 color_by=umap_color_by,
             )
+            
+            print(adata.obs.columns)
 
             st.pyplot(
                 fig,
@@ -242,7 +248,7 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
                 st.subheader("Spatial")
                 color_by = st.selectbox(
                     "Color cells by",
-                    options=list(adata.obs.columns),
+                    options=color_options(adata),
                     placeholder="squidpy_domains",
                     key="spatial_color_by",
                 )
