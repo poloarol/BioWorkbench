@@ -300,11 +300,9 @@ def get_spatially_variable_genes(
 
     # Build the spatial graph if it doesn't already exist.
     if "spatial_connectivities" not in adata.obsp:
-        sq.gr.spatial_neighbors(
+        sq.gr.spatial_neighbors_delaunay(
             adata,
             spatial_key="spatial",
-            coord_type="generic",
-            delaunay=True,
         )
 
     # Exclude blank probes before testing.

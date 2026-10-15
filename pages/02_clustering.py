@@ -288,10 +288,10 @@ if "X_pca" in adata.obsm or "X_umap" in adata.obsm:
 # Highly variable genes
 # -----------------------------------------------------------------------------
 
-if "highly_variable" in adata.var:
-    st.divider()
-    st.subheader("Highly Variable Genes")
-    render_hvg(adata, key="hvg")
+# if "highly_variable" in adata.var:
+#     st.divider()
+#     st.subheader("Highly Variable Genes")
+#     render_hvg(adata, key="hvg")
 
 if 'cluster_label' in adata.obs:
     adata = identify_marker_genes(adata, groupby="cluster_label")
