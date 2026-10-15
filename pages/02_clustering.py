@@ -7,7 +7,7 @@ import streamlit as st
 if "is_spatial" not in st.session_state:
     st.session_state["is_spatial"] = False
 
-from src.clustering import run_clustering, run_pca, identify_marker_genes, identify_spatial_domains, run_spatially_variable_genes, RANDOM_STATE
+from src.clustering import compute_elbow, run_clustering, run_pca, identify_marker_genes, identify_spatial_domains, run_spatially_variable_genes, RANDOM_STATE
 from src.interactive import render_interactive, render_hvg, render_svg
 from src.utils import color_options
 
@@ -38,6 +38,10 @@ with st.sidebar:
         max_value=100,
         value=50,
         step=1,
+        help=(
+            "Use 'Preview elbow plot' below to see the variance explained per PC "
+            "before running PCA, then choose the PC where the curve flattens."
+        ),
     )
 
     st.subheader("UMAP / Clustering")
@@ -112,6 +116,31 @@ if st.session_state.get("is_spatial", False):
     col1, col2, col3 = st.columns(3)
 else:
     col1, col2 = st.columns(2)
+
+# -----------------------------------------------------------------------------
+# Elbow plot preview
+# -----------------------------------------------------------------------------
+
+with st.popover("Elbow plot (choose number of PCs)"):
+    if st.button("Compute elbow plot"):
+        with st.spinner("Computing PCA preview..."):
+            try:
+                st.session_state["elbow_variance"] = compute_elbow(
+                    adata, n_top_genes=n_top_genes
+                )
+            except Exception as exc:
+                st.error(f"Elbow preview failed: {exc}")
+
+    variance_ratio = st.session_state.get("elbow_variance")
+    if variance_ratio is not None:
+        fig, ax = plt.subplots(figsize=(6, 3.5))
+        ax.plot(range(1, len(variance_ratio) + 1), variance_ratio, marker="o", markersize=3)
+        ax.axvline(n_comps, color="red", linestyle="--", linewidth=1)
+        ax.set_xlabel("Principal component")
+        ax.set_ylabel("Variance ratio")
+        st.pyplot(fig)
+        plt.close(fig)
+        st.caption("Red line = currently selected number of PCs.")
 
 # -----------------------------------------------------------------------------
 # Pipeline controls

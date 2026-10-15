@@ -99,6 +99,18 @@ def run_pca(adata: sc.AnnData, n_top_genes: int = 2000, n_comps: int = 50) -> sc
 
     return adata
 
+def compute_elbow(adata: sc.AnnData, n_top_genes: int = 2000, max_comps: int = 100):
+    """Return the PCA variance ratios computed on a copy, leaving adata untouched."""
+    tmp = adata.copy()
+    if "raw" in tmp.layers:
+        tmp.X = tmp.layers["raw"].copy()
+    tmp = _normalize_and_log_transform(tmp)
+    tmp = _identify_highly_variable_genes(tmp, n_top_genes=n_top_genes)
+    n_comps = max(2, min(max_comps, tmp.n_obs - 1, int(tmp.var["highly_variable"].sum()) - 1))
+    sc.pp.pca(tmp, n_comps=n_comps, random_state=RANDOM_STATE)
+    return tmp.uns["pca"]["variance_ratio"]
+
+
 def _run_umap(adata: sc.AnnData, n_neighbors: int = 15, min_dist: float = 0.1) -> sc.AnnData:
     """
     Perform UMAP dimensionality reduction on an AnnData object.
