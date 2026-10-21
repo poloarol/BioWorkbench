@@ -89,10 +89,11 @@ adata = None
 
 filtered_key = (
     "filtered_wout_blanks"
-    if st.session_state.get("is_spatial", False)
+    if st.session_state.get('spatial_technology') in ("MERFISH", "Xenium", "CosMx")
     else "filtered_wout_doublets"
 )
 filtered = st.session_state.get("adatas", {}).get(filtered_key)
+
 
 if filtered is None:
     st.info("Apply filtering on the Cell and Gene Filtering page first.")

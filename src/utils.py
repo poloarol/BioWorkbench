@@ -4,6 +4,8 @@ import squidpy as sq
 import numpy as np
 import pandas as pd
 
+from scipy import sparse
+
 _EXCLUDED_COLOR_COLUMNS = {"_cell_id", "cellid"}
 _EXCLUDED_COLOR_PREFIXES = ("center_", "polygon_center_")
 
@@ -21,7 +23,8 @@ def color_options(adata: sc.AnnData) -> list[str]:
 def load_data(filepath: str, 
             cell_columns: list[str] = None, 
             genes: list[str] = None,
-            is_spatial: bool = False) -> dict[str, sc.AnnData]:
+            is_spatial: bool = False,
+            platform: str = None) -> dict[str, sc.AnnData]:
     """
     Load a dataset from a file and return a dictionary of AnnData objects.
 
@@ -45,29 +48,151 @@ def load_data(filepath: str,
     if genes is None and cell_columns is None:
         adata = sc.read(filepath)
         if is_spatial:
-            validate_spatial_adata(adata)
-        _calculate_qc_metrics(adata, is_spatial=is_spatial)
-        adata.layers['raw'] = adata.X.copy()
-        
-        if is_spatial:
-            _add_spatial_qc(adata)
-    else:
-        adata = sc.read(filepath, backed='r')
-        obs_index = slice(None) if cell_columns is None else cell_columns
-        var_index = slice(None) if genes is None else genes
-        sdata = adata[obs_index, var_index].to_memory()
-        if is_spatial:
-            validate_spatial_adata(sdata)
-        _calculate_qc_metrics(sdata, is_spatial=is_spatial)
-        sdata.layers['raw'] = sdata.X.copy()
-        if is_spatial:
-            _add_spatial_qc(sdata)
+            if platform is not None and platform.lower() == "merfish":
+                validate_merfish_adata(adata)
+                _calculate_qc_metrics(adata, is_spatial=is_spatial)
+                _add_merfish_qc(adata)
+            elif platform is not None and "visium" in platform.lower():
+                validate_visium_hd_adata(adata)
+                _calculate_qc_metrics(adata, is_spatial=False)
+                adata.obs['center_x'] = adata.obsm['spatial'][:, 0] # bad fix for Visium HD
+                adata.obs['center_y'] = adata.obsm['spatial'][:, 1]
+    # else:
+    #     adata = sc.read(filepath, backed='r')
+    #     obs_index = slice(None) if cell_columns is None else cell_columns
+    #     var_index = slice(None) if genes is None else genes
+    #     sdata = adata[obs_index, var_index].to_memory()
+    #     if is_spatial:
+    #         validate_spatial_adata(sdata, platform=platform)
+    #     _calculate_qc_metrics(sdata, is_spatial=is_spatial)
+    #     sdata.layers['raw'] = sdata.X.copy()
+    #     if platform is not None and platform.lower() == "merfish":
+    #         _add_merfish_qc(sdata)
     
     return {'raw': adata, 'subset': sdata}
 
 
-def validate_spatial_adata(adata: sc.AnnData) -> None:
-    """Raise a ValueError with an actionable message if a spatial dataset is unusable."""
+
+def validate_visium_hd_adata(
+    adata: sc.AnnData,
+    *,
+    require_spatial_metadata: bool = False,
+    require_raw_counts: bool = False,
+) -> None:
+    """
+    Validate an AnnData object for Visium HD spatial analysis.
+
+    Raises ValueError with an actionable message when validation fails.
+
+    Parameters
+    ----------
+    adata
+        AnnData object containing Visium HD data.
+    require_spatial_metadata
+        If True, require non-empty uns['spatial'] metadata.
+    require_raw_counts
+        If True, require a non-negative integer-like expression matrix.
+        Use this only when adata.X is expected to contain raw counts.
+    """
+
+    # 1. Basic AnnData integrity
+    if adata.n_obs == 0 or adata.n_vars == 0:
+        raise ValueError("The dataset has no observations or no genes.")
+
+    if not adata.obs_names.is_unique:
+        raise ValueError("Observation identifiers must be unique.")
+
+    if not adata.var_names.is_unique:
+        raise ValueError("Gene identifiers must be unique.")
+
+    # 2. Spatial coordinates
+    if "spatial" not in adata.obsm:
+        raise ValueError(
+            "Missing adata.obsm['spatial']. Load the Visium HD data "
+            "with a spatial-aware reader or provide valid coordinates."
+        )
+
+    coords = np.asarray(adata.obsm["spatial"])
+    
+    print(coords)
+
+    if coords.shape != (adata.n_obs, 2):
+        raise ValueError(
+            "Expected spatial coordinates with shape "
+            f"({adata.n_obs}, 2); received {coords.shape}."
+        )
+
+    try:
+        coords = coords.astype(np.float64, copy=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Spatial coordinates must be numeric.") from exc
+
+    if not np.isfinite(coords).all():
+        raise ValueError("Spatial coordinates contain non-finite values.")
+
+    # 3. Expression matrix
+    X = adata.X
+
+    if X is None:
+        raise ValueError("The AnnData object has no expression matrix.")
+
+    values = X.data if sparse.issparse(X) else np.asarray(X)
+
+    if not np.issubdtype(values.dtype, np.number):
+        raise ValueError("The expression matrix must contain numeric values.")
+
+    if not np.isfinite(values).all():
+        raise ValueError("The expression matrix contains non-finite values.")
+
+    if require_raw_counts:
+        if np.any(values < 0):
+            raise ValueError(
+                "Raw counts cannot be negative. Check whether the matrix "
+                "contains normalized or transformed expression values."
+            )
+
+        if not np.allclose(values, np.round(values)):
+            raise ValueError(
+                "Raw counts should be integer-like, but non-integer values "
+                "were found. Check which matrix or layer contains raw counts."
+            )
+
+    # 4. Visium spatial metadata
+    spatial_metadata = adata.uns.get("spatial")
+
+    if require_spatial_metadata:
+        if not isinstance(spatial_metadata, dict) or not spatial_metadata:
+            raise ValueError(
+                "Missing or empty adata.uns['spatial']. "
+                "Image overlays may not be available."
+            )
+
+    # 5. Optional image metadata sanity check
+    if isinstance(spatial_metadata, dict):
+        for library_id, library in spatial_metadata.items():
+            if not isinstance(library, dict):
+                raise ValueError(
+                    f"Spatial metadata for '{library_id}' is malformed."
+                )
+
+            # Images and scale factors can be absent in some valid objects.
+            images = library.get("images", {})
+            if images is not None and not isinstance(images, dict):
+                raise ValueError(
+                    f"Image metadata for '{library_id}' must be a dictionary."
+                )
+
+            scalefactors = library.get("scalefactors", {})
+            if scalefactors is not None and not isinstance(
+                scalefactors, dict
+            ):
+                raise ValueError(
+                    f"Scale-factor metadata for '{library_id}' must "
+                    "be a dictionary."
+                )
+
+def validate_merfish_adata(adata: sc.AnnData) -> None:
+    """Raise a ValueError with an actionable message if a MERFISH dataset is unusable."""
 
     if adata.n_obs == 0 or adata.n_vars == 0:
         raise ValueError("The dataset is empty (no cells or no genes).")
@@ -97,7 +222,7 @@ def validate_spatial_adata(adata: sc.AnnData) -> None:
         raise ValueError("All cells have zero total counts.")
 
 
-def _add_spatial_qc(adata: sc.AnnData) -> None:
+def _add_merfish_qc(adata: sc.AnnData) -> None:
     """Add blank-count QC columns and the spatial embedding to a validated dataset."""
 
     blank_mask = adata.var_names.str.startswith("Blank-")

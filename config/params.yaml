@@ -22,7 +22,7 @@ spatial:
 
 
   Visium HD:
-    min_genes: 100
+    min_genes: 200
     min_cells: 3
-    max_mito_percent: 1
-    expected_doublet_rate: 0.01
+    max_mito_percent: 20
+    expected_doublet_rate: 0.05

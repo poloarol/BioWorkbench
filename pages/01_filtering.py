@@ -52,6 +52,9 @@ if "genes" not in st.session_state:
 if 'is_spatial' not in st.session_state:
     st.session_state.is_spatial = False
 
+if "spatial_technology" not in st.session_state:
+    st.session_state.spatial_technology = "None — single-cell dataset"
+
 
 # ============================================================
 # Helper functions
@@ -190,11 +193,10 @@ with st.sidebar:
             st.session_state.params = imported_params
             st.session_state.is_spatial = is_spatial
             saved_technology = imported_params.get("spatial_technology")
+            st.session_state.pop("spatial_technology_widget", None)
             st.session_state["spatial_technology"] = (
                 saved_technology
-                if is_spatial and saved_technology == "MERFISH"
-                else "MERFISH"
-                if is_spatial
+                if is_spatial and saved_technology in ("MERFISH", "Visium HD", "Xenium", "CosMx")
                 else "None — single-cell dataset"
             )
             st.session_state.filtered = any(
@@ -227,20 +229,29 @@ with st.sidebar:
 
     st.divider()
     
+    technology_options = [
+        "None — single-cell dataset",
+        "MERFISH",
+        "Visium HD",
+        "Xenium",
+        "CosMx",
+    ]
+    # Widget keys are dropped when the page is left, so persist under a plain key.
     spatial_technology = st.sidebar.selectbox(
         "Technology",
-        [
-            "None — single-cell dataset",
-            "MERFISH",
-            # "Xenium",
-            # "CosMX",
-            # "Visium HD",
-        ],
-        key="spatial_technology",
+        technology_options,
+        index=technology_options.index(st.session_state["spatial_technology"])
+        if st.session_state["spatial_technology"] in technology_options
+        else 0,
+        key="spatial_technology_widget",
     )
-    
-    is_spatial = spatial_technology != "None — single-cell dataset"
+    st.session_state["spatial_technology"] = spatial_technology
+
+    is_spatial = st.session_state['spatial_technology'] != "None — single-cell dataset"
     st.session_state["is_spatial"] = is_spatial
+    # Visium HD uses the single-cell QC (mitochondrial %, doublets); only
+    # MERFISH is filtered on blank probes.
+    uses_blanks = st.session_state['spatial_technology'] == "MERFISH"
     
     config = get_filtering_config(
         "spatial" if is_spatial else "single_cell",
@@ -284,7 +295,10 @@ with st.sidebar:
 
     if adata_file is not None:
         uploaded_bytes = adata_file.getvalue()
-        upload_signature = hashlib.sha256(uploaded_bytes).hexdigest()
+        # The technology is part of the signature so switching it reloads the file.
+        upload_signature = hashlib.sha256(
+            uploaded_bytes + spatial_technology.encode()
+        ).hexdigest()
         is_unchanged_upload_after_restore = (
             st.session_state.get("bundle_restored")
             and st.session_state.uploaded_adata_name == adata_file.name
@@ -305,6 +319,7 @@ with st.sidebar:
                     loaded_adatas = load_data(
                         str(tmp_path),
                         is_spatial=is_spatial,
+                        platform=spatial_technology
                     )
 
                 if loaded_adatas is None:
@@ -407,7 +422,7 @@ with st.sidebar:
             step=1,
         )
         
-        if is_spatial:
+        if uses_blanks:
             
             blank_threshold_default = get_saved_number(
                 "blank_threshold",
@@ -483,7 +498,7 @@ with st.sidebar:
                         min_cells=float(min_cells),
                         max_mt_percentage=float(max_mt_percentage),
                         expected_doublet_rate=float(exp_doublet_rate),
-                        is_spatial=is_spatial,
+                        is_spatial=uses_blanks,
                         blank_max_percentage=float(blank_threshold)
                     )
 
@@ -499,7 +514,7 @@ with st.sidebar:
                         "The filters removed all cells. "
                         "Try less restrictive filtering parameters."
                     )
-                    if is_spatial:
+                    if uses_blanks:
                         st.session_state.adatas[
                             "filtered_w_blanks"
                         ] = adata_filtered
@@ -516,7 +531,7 @@ with st.sidebar:
                     st.session_state.filtered = True
 
                 else:
-                    if is_spatial:
+                    if uses_blanks:
                         if "pct_counts_blank" not in adata_filtered.obs.columns:
                             st.warning(
                                 "Filtering completed, but "
@@ -593,10 +608,10 @@ st.title("Analysis")
 
 base_adata = get_base_adata()
 
-if is_spatial:
+if st.session_state['spatial_technology'] == "MERFISH":
     filtered_adata = get_adata("filtered_w_blanks")
     singlet_adata = get_adata("filtered_wout_blanks")
-else:
+elif st.session_state['spatial_technology'] == "None — single-cell dataset" or st.session_state['spatial_technology'] == "Visium HD":
     filtered_adata = get_adata("filtered_w_doublets")
     singlet_adata = get_adata("filtered_wout_doublets")
 
@@ -620,7 +635,7 @@ st.caption(
     f"{base_adata.n_vars:,} genes**"
 )
 
-if is_spatial:
+if st.session_state['spatial_technology'] == "MERFISH":
     total_counts = base_adata.obs["total_counts"].sum()
     blank_percentage = (
         base_adata.obs["blank_counts"].sum() / total_counts * 100
@@ -665,12 +680,10 @@ if filtered_adata is None:
 # ============================================================
 
 
-ttl: str = 'Blank' if is_spatial else 'Doublet'
-
-print(filtered_adata)
+ttl: str = 'Blank' if st.session_state['spatial_technology'] == "MERFISH" else 'Doublet'
 
 if selected == "Top Gene":
-    if is_spatial:
+    if st.session_state['spatial_technology'] == "MERFISH":
         x = base_adata.obs["pct_counts_blank"].dropna()
 
         fig = make_subplots(
@@ -767,7 +780,7 @@ if selected == "Top Gene":
                 st.info("No spatially variable genes are available.")
 
         with col2:
-            st.subheader("Filtered with Blanks")
+            st.subheader(f"Filtered with {ttl}s")
             color_by = st.selectbox(
                 "Module Score",
                 options=gene_set2,
@@ -780,7 +793,7 @@ if selected == "Top Gene":
                 st.info("No spatially variable genes are available.")
 
         with col3:
-            st.subheader("Filtered without Blanks")
+            st.subheader(f"Filtered without {ttl}s")
             color_by = st.selectbox(
                 "Module Score",
                 options=gene_set3,
@@ -840,9 +853,14 @@ if selected == "Top Gene":
 elif selected == "QC Metrics":
 
     try:
-        fig_one = plot_qc_metrics(base_adata, is_spatial=is_spatial)
-        fig_two = plot_qc_metrics(filtered_adata, is_spatial=is_spatial)
-        fig_three = plot_qc_metrics(singlet_adata, is_spatial=is_spatial)
+        fig_one = plot_qc_metrics(base_adata, is_spatial=is_spatial, platform=st.session_state['spatial_technology'])
+        fig_two = plot_qc_metrics(filtered_adata, is_spatial=is_spatial, platform=st.session_state['spatial_technology'])
+        fig_three = plot_qc_metrics(singlet_adata, is_spatial=is_spatial, platform=st.session_state['spatial_technology'])
+        
+        if st.session_state['spatial_technology'] in ("MERFISH", "Xenium", "CosMx"):
+            color_by = ["is_blank", "log1p_n_genes_by_counts", "log1p_total_counts"]
+        else:
+            color_by = ["log1p_n_genes_by_counts", "log1p_total_counts", "pct_counts_mt"]
 
         st.subheader("Subset / Raw")
         if is_spatial:
@@ -852,11 +870,7 @@ elif selected == "QC Metrics":
             with col2:
                 spatial_qc_plt = plot_spatial(
                     base_adata,
-                    color_by=[
-                        "pct_counts_blank",
-                        "n_genes_by_counts",
-                        "total_counts",
-                    ],
+                    color_by=color_by
                 )
                 st.pyplot(spatial_qc_plt, use_container_width=True)     
         else:
@@ -872,11 +886,7 @@ elif selected == "QC Metrics":
             with col2:
                 spatial_qc_plt = plot_spatial(
                     filtered_adata,
-                    color_by=[
-                        "is_blank",
-                        "n_genes_by_counts",
-                        "total_counts",
-                    ],
+                    color_by=color_by,
                 )
                 st.pyplot(spatial_qc_plt, use_container_width=True)
         else:
@@ -892,11 +902,7 @@ elif selected == "QC Metrics":
             with col2:
                 spatial_qc_plt = plot_spatial(
                     singlet_adata,
-                    color_by=[
-                        # "is_blank",
-                        "n_genes_by_counts",
-                        "total_counts",
-                    ],
+                    color_by=color_by,
                 )
                 st.pyplot(spatial_qc_plt, use_container_width=True)
         else:

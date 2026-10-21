@@ -39,6 +39,7 @@ def highest_expressed_genes(adata: sc.AnnData, n_top_genes: int = 10) -> plt.Fig
 def plot_qc_metrics(
     adata: sc.AnnData,
     is_spatial: bool = False,
+    platform: str = None,
 ) -> plt.Figure:
     """
     Plot quality control metrics for an AnnData object.
@@ -56,19 +57,19 @@ def plot_qc_metrics(
         The matplotlib figure containing the QC metrics plots.
     """
 
-    if is_spatial:
+    if is_spatial and platform is not None and "visium" not in platform.lower():
         fig, axs = plt.subplots(1, 3, figsize=WIDE_FIGSIZE)
 
         axs[0].set_title("Total transcripts per cell")
         sns.histplot(
-            adata.obs["total_counts"],
+            adata.obs["log1p_total_counts"],
             kde=False,
             ax=axs[0],
         )
 
         axs[1].set_title("Unique transcripts per cell")
         sns.histplot(
-            adata.obs["n_genes_by_counts"],
+            adata.obs["log1p_n_genes_by_counts"],
             kde=False,
             ax=axs[1],
         )
@@ -96,7 +97,7 @@ def plot_qc_metrics(
     # Non-spatial QC
     sc.pl.violin(
         adata,
-        ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
+        ["log1p_n_genes_by_counts", "log1p_total_counts", "pct_counts_mt"],
         jitter=0.4,
         multi_panel=True,
         show=False,
