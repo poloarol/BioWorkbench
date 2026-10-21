@@ -10,7 +10,7 @@ BioWorkbench was built for people who want to spend their time thinking about bi
 
 > 🚧 **BioWorkbench is currently in beta.**
 >
-> The current beta focuses on conventional single-cell RNA-seq and MERFISH spatial transcriptomics. The project is actively evolving, and feedback from researchers using real datasets is welcome.
+> The current beta focuses on conventional single-cell RNA-seq, MERFISH, and Visium HD spatial transcriptomics. The project is actively evolving, and feedback from researchers using real datasets is welcome.
 
 ---
 
@@ -111,13 +111,13 @@ Users can interactively adjust parameters including:
 
 ---
 
-## 🧬 MERFISH spatial transcriptomics
+## 🧬 Spatial transcriptomics
 
-BioWorkbench currently includes an imaging-based spatial workflow for **MERFISH** datasets.
+BioWorkbench currently includes spatial workflows for **MERFISH** and **Visium HD** datasets. The workflows share spatial visualization and domain-analysis capabilities while keeping modality-specific quality control separate.
 
-The MERFISH workflow incorporates modality-specific information that is not captured by conventional scRNA-seq QC.
+### MERFISH
 
-Current functionality includes:
+The imaging-based MERFISH workflow incorporates modality-specific information that is not captured by conventional scRNA-seq QC. Current functionality includes:
 
 * Cell-level spatial coordinates
 * Transcript counts per cell
@@ -133,17 +133,31 @@ Current functionality includes:
 * Cell-type annotation in tissue coordinates
 * Gene-expression visualization in tissue space
 * Module-score visualization in tissue space
-* Comparison of transcriptional and spatial organization
 
-The spatial workflow uses the AnnData representation:
+MERFISH QC includes blank-transcript measurements and segmentation-derived cell metadata.
+
+### Visium HD
+
+The Visium HD workflow supports spatial expression data represented as AnnData, including:
+
+* Spatial-coordinate validation and tissue-coordinate visualization
+* QC metrics and gene/cell filtering
+* Mitochondrial filtering and Scrublet-based doublet detection
+* PCA, UMAP, and Leiden clustering
+* Spatial-domain identification
+* Visualization of observation metadata and expression in tissue coordinates
+
+Visium HD uses the standard gene-expression QC and doublet-detection path.
+
+### Spatial coordinates
+
+Spatial workflows use the AnnData representation:
 
 ```text
 adata.obsm["spatial"]
 ```
 
-for standardized cell coordinates.
-
-This allows the same analyzed cells to be explored from two complementary perspectives:
+for two-dimensional spatial coordinates. The same analyzed observations can therefore be explored from two complementary perspectives:
 
 ```text
           UMAP                         Tissue
@@ -197,7 +211,7 @@ A typical single-cell analysis can follow:
 15. Export processed AnnData
 ```
 
-For MERFISH, spatial QC and spatial analysis can be incorporated into the workflow.
+For MERFISH and Visium HD, spatial QC and spatial analysis can be incorporated into the workflow. The available QC metrics and filtering steps depend on the selected technology.
 
 ---
 
@@ -226,6 +240,9 @@ celltypist_conf_score
 ```
 
 BioWorkbench also supports custom annotation workflows using JSON input.
+
+**NB**:
+BioWorkbench does not support deconvolution or automatic annotation of VisiumHD data. However, you can perform manual annotation.
 
 ---
 
@@ -333,7 +350,11 @@ Spatial coordinates are standardized internally through:
 adata.obsm["spatial"]
 ```
 
-The current spatial workflow is configured for MERFISH. The input must include `center_x` and `center_y` in `adata.obs`; blank-probe genes are identified by names beginning with `Blank-`. Spatial QC plots also use the cell `volume` metadata column. Input requirements may evolve as additional spatial technologies are introduced.
+The MERFISH input must include `center_x` and `center_y` in `adata.obs`; blank-probe genes are identified by names beginning with `Blank-`. Spatial QC plots also use the cell `volume` metadata column.
+
+### Visium HD input
+
+The Visium HD workflow expects a spatially aware AnnData (`.h5ad`) object with a numeric expression matrix in `adata.X` and two-dimensional coordinates in `adata.obsm["spatial"]`. Coordinates must be finite and provided for each observation. BioWorkbench validates the data and exposes the coordinate columns for spatial plotting. Non-empty `adata.uns["spatial"]` metadata is not required by the current workflow.
 
 ---
 
@@ -356,6 +377,8 @@ single_cell:
 spatial:
   MERFISH:
     ...
+  Visium HD:
+    ...
 ```
 
 Configuration values provide defaults for the interactive workflows and can be adjusted through the application where supported.
@@ -370,6 +393,7 @@ The current beta focuses on:
 
 * Single-cell RNA-seq
 * MERFISH spatial transcriptomics
+* Visium HD spatial transcriptomics
 * Quality control and filtering
 * Dimensionality reduction and clustering
 * Marker-gene analysis
@@ -619,6 +643,9 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [x] Processed AnnData export
 * [x] MERFISH input
 * [x] MERFISH-specific QC
+* [x] Visium HD AnnData input and spatial-coordinate validation
+* [x] Visium HD QC and filtering
+* [x] Visium HD clustering and spatial-domain identification
 * [x] Spatial coordinate visualization
 * [x] Spatial annotation visualization
 * [x] Spatial-domain identification
@@ -639,6 +666,7 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [ ] Improved reproducibility and configuration management
 * [ ] Expanded documentation
 * [ ] Continuous integration
+* [ ] Visium HD deconvolution and Automatic Annotation
 
 ## Planned
 
@@ -646,7 +674,6 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 
 * [ ] Xenium
 * [ ] CosMX
-* [ ] Visium HD
 
 ### Spatial analysis
 
