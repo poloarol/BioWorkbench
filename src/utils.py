@@ -20,6 +20,56 @@ def color_options(adata: sc.AnnData) -> list[str]:
     ]
 
 
+MODALITIES = ("single_cell", "visium_hd", "merfish")
+
+# Per-modality QC contract. "required" metrics must exist before filtering,
+# "optional" ones are used when present, and "unavailable" ones are never
+# produced for the modality, so nothing may depend on them.
+QC_METRIC_CONTRACT = {
+    "single_cell": {
+        "required_obs": ("total_counts", "n_genes_by_counts"),
+        "optional_obs": ("pct_counts_mt", "pct_counts_ribo", "pct_counts_hb"),
+        "unavailable_obs": ("blank_counts", "pct_counts_blank", "is_blank"),
+        "required_obsm": (),
+    },
+    "visium_hd": {
+        "required_obs": ("total_counts", "n_genes_by_counts"),
+        "optional_obs": ("pct_counts_mt", "pct_counts_ribo", "pct_counts_hb"),
+        "unavailable_obs": ("blank_counts", "pct_counts_blank", "is_blank", "volume"),
+        # center_x/center_y are derived from this by the loader, not required.
+        "required_obsm": ("spatial",),
+    },
+    "merfish": {
+        "required_obs": ("total_counts", "blank_counts", "pct_counts_blank"),
+        "optional_obs": ("n_genes_by_counts", "volume"),
+        "unavailable_obs": ("pct_counts_mt", "predicted_doublet"),
+        "required_obsm": ("spatial",),
+    },
+}
+
+
+def qc_metric_availability(adata: sc.AnnData, modality: str) -> dict[str, list[str]]:
+    """Report which QC metrics of the modality contract are present or missing."""
+    if modality not in QC_METRIC_CONTRACT:
+        raise ValueError(
+            f"Unknown modality {modality!r}; expected one of {MODALITIES}."
+        )
+    contract = QC_METRIC_CONTRACT[modality]
+    return {
+        "missing_required": [
+            f"obs['{c}']" for c in contract["required_obs"] if c not in adata.obs.columns
+        ] + [
+            f"obsm['{k}']" for k in contract["required_obsm"] if k not in adata.obsm
+        ],
+        "missing_optional": [
+            c for c in contract["optional_obs"] if c not in adata.obs.columns
+        ],
+        "unexpected_unavailable": [
+            c for c in contract["unavailable_obs"] if c in adata.obs.columns
+        ],
+    }
+
+
 def load_data(filepath: str, 
             cell_columns: list[str] = None, 
             genes: list[str] = None,
@@ -55,8 +105,7 @@ def load_data(filepath: str,
             elif platform is not None and "visium" in platform.lower():
                 validate_visium_hd_adata(adata)
                 _calculate_qc_metrics(adata, is_spatial=False)
-                adata.obs['center_x'] = adata.obsm['spatial'][:, 0] # bad fix for Visium HD
-                adata.obs['center_y'] = adata.obsm['spatial'][:, 1]
+                _add_visium_center_columns(adata)
     # else:
     #     adata = sc.read(filepath, backed='r')
     #     obs_index = slice(None) if cell_columns is None else cell_columns
@@ -71,6 +120,45 @@ def load_data(filepath: str,
     
     return {'raw': adata, 'subset': sdata}
 
+
+
+def _validate_identifiers(names: pd.Index, label: str) -> None:
+    """Reject identifiers that cannot safely key observations or genes."""
+    if not names.is_unique:
+        duplicated = names[names.duplicated()].unique()[:3].tolist()
+        raise ValueError(
+            f"{label} identifiers must be unique; duplicates include "
+            f"{duplicated}. Make them unique explicitly rather than relying "
+            "on automatic renaming."
+        )
+
+    as_text = names.astype(str).str.strip()
+    blank = (as_text == "") | as_text.str.lower().isin({"nan", "none", "<na>"})
+    if blank.any():
+        raise ValueError(
+            f"{label} identifiers must be non-empty; found {int(blank.sum())} "
+            "empty or missing identifier(s)."
+        )
+
+
+def _add_visium_center_columns(adata: sc.AnnData) -> None:
+    """Expose obsm['spatial'] as center_x/center_y for the plotting helpers.
+
+    Existing columns are kept when they agree with obsm['spatial'] and are
+    never overwritten; a disagreement is ambiguous, so it is reported.
+    """
+    coords = np.asarray(adata.obsm["spatial"], dtype=np.float64)
+    for column, values in (("center_x", coords[:, 0]), ("center_y", coords[:, 1])):
+        if column not in adata.obs.columns:
+            adata.obs[column] = values
+            continue
+        existing = pd.to_numeric(adata.obs[column], errors="coerce").to_numpy(dtype=float)
+        if not np.allclose(existing, values, equal_nan=False):
+            raise ValueError(
+                f"adata.obs['{column}'] already exists and differs from "
+                "adata.obsm['spatial']. Remove or rename the column, or make "
+                "the two coordinate sources consistent."
+            )
 
 
 def validate_visium_hd_adata(
@@ -96,14 +184,19 @@ def validate_visium_hd_adata(
     """
 
     # 1. Basic AnnData integrity
+    if not isinstance(adata, sc.AnnData):
+        raise ValueError(
+            f"Expected an AnnData object; received {type(adata).__name__}."
+        )
+
     if adata.n_obs == 0 or adata.n_vars == 0:
-        raise ValueError("The dataset has no observations or no genes.")
+        raise ValueError(
+            "The dataset has no observations or no genes "
+            f"(shape {adata.n_obs} x {adata.n_vars})."
+        )
 
-    if not adata.obs_names.is_unique:
-        raise ValueError("Observation identifiers must be unique.")
-
-    if not adata.var_names.is_unique:
-        raise ValueError("Gene identifiers must be unique.")
+    _validate_identifiers(adata.obs_names, "Observation")
+    _validate_identifiers(adata.var_names, "Gene")
 
     # 2. Spatial coordinates
     if "spatial" not in adata.obsm:
@@ -112,9 +205,14 @@ def validate_visium_hd_adata(
             "with a spatial-aware reader or provide valid coordinates."
         )
 
-    coords = np.asarray(adata.obsm["spatial"])
-    
-    print(coords)
+    raw_coords = adata.obsm["spatial"]
+    if isinstance(raw_coords, pd.DataFrame):
+        # AnnData already guarantees the index matches adata.obs_names.
+        raw_coords = raw_coords.to_numpy()
+    if sparse.issparse(raw_coords):
+        raise ValueError("adata.obsm['spatial'] must be a dense numeric array.")
+
+    coords = np.asarray(raw_coords)
 
     if coords.shape != (adata.n_obs, 2):
         raise ValueError(
@@ -122,13 +220,26 @@ def validate_visium_hd_adata(
             f"({adata.n_obs}, 2); received {coords.shape}."
         )
 
+    if coords.dtype == bool:
+        raise ValueError("Spatial coordinates must be numeric, not boolean.")
+
     try:
         coords = coords.astype(np.float64, copy=False)
     except (TypeError, ValueError) as exc:
         raise ValueError("Spatial coordinates must be numeric.") from exc
 
     if not np.isfinite(coords).all():
-        raise ValueError("Spatial coordinates contain non-finite values.")
+        n_bad = int((~np.isfinite(coords).all(axis=1)).sum())
+        raise ValueError(
+            f"Spatial coordinates contain non-finite values in {n_bad} "
+            "observation(s)."
+        )
+
+    if adata.n_obs > 1 and (coords == coords[0]).all():
+        raise ValueError(
+            "All spatial coordinates are identical, so the dataset has no "
+            "spatial extent. Check that the coordinates were exported correctly."
+        )
 
     # 3. Expression matrix
     X = adata.X
@@ -136,13 +247,39 @@ def validate_visium_hd_adata(
     if X is None:
         raise ValueError("The AnnData object has no expression matrix.")
 
+    if not (sparse.issparse(X) or isinstance(X, np.ndarray)):
+        raise ValueError(
+            "The expression matrix must be a NumPy array or SciPy sparse "
+            f"matrix; received {type(X).__name__}. Backed or lazy matrices "
+            "are not supported here."
+        )
+
+    if X.ndim != 2 or tuple(X.shape) != (adata.n_obs, adata.n_vars):
+        raise ValueError(
+            "The expression matrix shape "
+            f"{tuple(X.shape)} does not match the dataset dimensions "
+            f"({adata.n_obs}, {adata.n_vars})."
+        )
+
     values = X.data if sparse.issparse(X) else np.asarray(X)
 
-    if not np.issubdtype(values.dtype, np.number):
+    if values.dtype == bool or not np.issubdtype(values.dtype, np.number):
         raise ValueError("The expression matrix must contain numeric values.")
 
     if not np.isfinite(values).all():
         raise ValueError("The expression matrix contains non-finite values.")
+
+    if np.any(values < 0):
+        raise ValueError(
+            "The expression matrix contains negative values, which are "
+            "invalid for QC and filtering. Check whether it holds scaled or "
+            "transformed expression instead of counts."
+        )
+
+    # Stored zeros in a sparse matrix are legitimate; only a matrix with no
+    # signal at all is unusable.
+    if not np.any(values):
+        raise ValueError("The expression matrix is all zeros.")
 
     if require_raw_counts:
         if np.any(values < 0):
@@ -190,6 +327,27 @@ def validate_visium_hd_adata(
                     f"Scale-factor metadata for '{library_id}' must "
                     "be a dictionary."
                 )
+
+            # Optional numeric scale factors must be usable when supplied.
+            for factor in (
+                "spot_diameter_fullres",
+                "tissue_hires_scalef",
+                "tissue_lowres_scalef",
+                "bin_size_um",
+            ):
+                value = (scalefactors or {}).get(factor)
+                if value is None:
+                    continue
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float, np.number))
+                    or not np.isfinite(value)
+                    or value <= 0
+                ):
+                    raise ValueError(
+                        f"Scale factor '{factor}' for '{library_id}' must be "
+                        f"a positive finite number; received {value!r}."
+                    )
 
 def validate_merfish_adata(adata: sc.AnnData) -> None:
     """Raise a ValueError with an actionable message if a MERFISH dataset is unusable."""
@@ -316,7 +474,7 @@ def _calculate_qc_metrics(adata, is_spatial=False):
     # --------------------------------------------------------
 
     # mitochondrial genes, "MT-" for human, "Mt-" for mouse
-    adata.var["mt"] = adata.var_names.str.startswith("MT-")
+    adata.var["mt"] = adata.var_names.str.startswith(("MT-", "Mt-"))
     # ribosomal genes
     adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
     # hemoglobin genes

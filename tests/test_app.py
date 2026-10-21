@@ -48,6 +48,26 @@ def test_upload_page_offers_bundle_restore_in_sidebar():
     assert any(button.label == "Restore bundle" for button in app.button)
 
 
+def test_selected_technology_persists_after_leaving_filtering_page():
+    app_path = Path(__file__).parents[1] / "app.py"
+    app = AppTest.from_file(str(app_path)).run(timeout=60)
+
+    app.switch_page("pages/01_filtering.py").run(timeout=60)
+    assert not app.exception
+    technology = next(box for box in app.selectbox if box.label == "Technology")
+    technology.select("Xenium").run(timeout=60)
+    assert not app.exception
+
+    app.switch_page("pages/02_clustering.py").run(timeout=60)
+    assert not app.exception
+    assert app.session_state["spatial_technology"] == "Xenium"
+
+    app.switch_page("pages/01_filtering.py").run(timeout=60)
+    assert not app.exception
+    technology = next(box for box in app.selectbox if box.label == "Technology")
+    assert technology.value == "Xenium"
+
+
 def test_filtering_page_uses_restored_numeric_parameters():
     app_path = Path(__file__).parents[1] / "app.py"
     app = AppTest.from_file(str(app_path)).run(timeout=60)

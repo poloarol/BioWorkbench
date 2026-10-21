@@ -4,13 +4,18 @@ import yaml
 
 from pathlib import Path
 
+import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
 from plotly.subplots import make_subplots
 
 from src.utils import load_data, get_spatially_variable_genes
-from src.filtering import data_filtering
+from src.filtering import (
+    data_filtering,
+    preview_filter_impact,
+    validate_filter_thresholds,
+)
 from src.interactive import render_interactive
 from src.plotting import (
     highest_expressed_genes,
@@ -405,6 +410,13 @@ with st.sidebar:
             max_value=1_000_000,
             value=min_genes_default,
             step=10,
+            help=(
+                "Observations (cells, or bins/spots for spatial data) with "
+                "fewer detected genes than this are REMOVED. A value equal "
+                "to the threshold is kept. Defaults come from "
+                "config/params.yaml and are not tuned to bin size or depth: "
+                "check the QC plots first."
+            ),
         )
 
         min_cells_default = get_saved_number(
@@ -420,6 +432,11 @@ with st.sidebar:
             max_value=1_000_000,
             value=min_cells_default,
             step=1,
+            help=(
+                "Genes detected in fewer observations than this (counted "
+                "after the minimum-genes step) are REMOVED from the "
+                "feature set. No observations are removed by this step."
+            ),
         )
         
         if uses_blanks:
@@ -435,7 +452,12 @@ with st.sidebar:
                 min_value=0.0,
                 max_value=100.0,
                 value=blank_threshold_default,
-                step=1.0
+                step=1.0,
+                help=(
+                    "Observations with a blank-probe percentage above this "
+                    "are FLAGGED in obs['is_blank'], and the page later "
+                    "builds a blank-free copy. Percent, 0-100."
+                ),
             )
             
         else:
@@ -452,6 +474,12 @@ with st.sidebar:
                 max_value=100.0,
                 value=max_mt_percentage_default,
                 step=1.0,
+                help=(
+                    "Observations whose mitochondrial percentage is at or "
+                    "above this value are REMOVED (strict '<' is kept). "
+                    "Percent, 0-100. Skipped, with a note in the filtering "
+                    "report, when no human 'MT-' genes are annotated."
+                ),
             )
 
             exp_doublet_rate_default = get_saved_number(
@@ -466,6 +494,11 @@ with st.sidebar:
                 max_value=1.0,
                 value=exp_doublet_rate_default,
                 step=0.01,
+                help=(
+                    "Fraction (0-1) passed to Scrublet. Predicted doublets "
+                    "are FLAGGED here, and are removed only in the "
+                    "'without doublets' copy used downstream."
+                ),
             )
             
 
@@ -490,6 +523,46 @@ with st.sidebar:
         elif adata.n_vars == 0:
             st.warning("The input dataset contains no genes.")
         else:
+            threshold_errors = validate_filter_thresholds(
+                min_genes=min_genes,
+                min_cells=min_cells,
+                **(
+                    {"blank_max_percentage": blank_threshold}
+                    if uses_blanks
+                    else {
+                        "max_mt_percentage": max_mt_percentage,
+                        "expected_doublet_rate": exp_doublet_rate,
+                    }
+                ),
+            )
+            for message in threshold_errors:
+                st.error(message)
+            if threshold_errors:
+                st.stop()
+
+            impact = preview_filter_impact(
+                adata,
+                min_genes,
+                min_cells,
+                None if uses_blanks else max_mt_percentage,
+            )
+            summary = (
+                f"These thresholds remove {impact['obs_removed_min_genes']:,} "
+                f"of {impact['n_obs']:,} observations (fewer than {min_genes} "
+                f"genes) and {impact['vars_removed_min_cells']:,} of "
+                f"{impact['n_vars']:,} genes (detected in fewer than "
+                f"{min_cells} observations)"
+            )
+            if impact["obs_removed_mito"] is not None:
+                summary += (
+                    f", then {impact['obs_removed_mito']:,} observations "
+                    f"with mitochondrial percentage >= {max_mt_percentage}"
+                )
+            summary += f". {impact['obs_remaining']:,} observations remain."
+            if impact["obs_remaining"] == 0 or impact["vars_remaining"] == 0:
+                st.warning(summary + " Nothing would be left: relax the thresholds.")
+            else:
+                st.info(summary)
             try:
                 with st.spinner("Applying filters..."):
                     adata_filtered = data_filtering(
@@ -499,11 +572,21 @@ with st.sidebar:
                         max_mt_percentage=float(max_mt_percentage),
                         expected_doublet_rate=float(exp_doublet_rate),
                         is_spatial=uses_blanks,
+                        modality=(
+                            "visium_hd"
+                            if spatial_technology == "Visium HD"
+                            else "merfish" if uses_blanks else "single_cell"
+                        ),
                         blank_max_percentage=float(blank_threshold)
                     )
 
                 # New filtering results invalidate any analysis built on the old ones.
                 clear_downstream_results()
+                st.session_state["filtering_report"] = (
+                    adata_filtered.uns.get("filtering_report")
+                    if adata_filtered is not None
+                    else None
+                )
 
                 if adata_filtered is None:
                     st.error("Filtering returned no data.")
@@ -645,6 +728,11 @@ if st.session_state['spatial_technology'] == "MERFISH":
     st.caption(f"Blank gene percentage: {blank_percentage:.2f}%")
 
 st.divider()
+
+filtering_report = st.session_state.get("filtering_report")
+if filtering_report is not None and st.session_state.filtered:
+    with st.expander("Filtering steps (counts before / after)"):
+        st.dataframe(filtering_report, hide_index=True, use_container_width=True)
 
 # ------------------------------------------------------------
 # Analysis selector
@@ -1051,7 +1139,7 @@ elif selected == "Statistics":
     # Prediction statistics
     # --------------------------------------------------------
 
-    if is_spatial:
+    if uses_blanks:
 
         # ----------------------------------------------------
         # Predicted blanks
@@ -1126,10 +1214,12 @@ elif selected == "Statistics":
         # ----------------------------------------------------
         # Predicted doublets
         # ----------------------------------------------------
+        
+        filtered_adata.obs['is_doublet'] = filtered_adata.obs['predicted_doublet'] > np.median(filtered_adata.obs['predicted_doublet'])
 
         predicted_doublet = get_bool_obs_column(
             filtered_adata,
-            "predicted_doublet",
+            "is_doublet",
         )
 
         if predicted_doublet is None:
