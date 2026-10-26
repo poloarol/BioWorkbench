@@ -10,7 +10,7 @@ BioWorkbench was built for people who want to spend their time thinking about bi
 
 > 🚧 **BioWorkbench is currently in beta.**
 >
-> The current beta focuses on conventional single-cell RNA-seq, MERFISH, and Visium HD spatial transcriptomics. The project is actively evolving, and feedback from researchers using real datasets is welcome.
+> The current beta focuses on conventional single-cell RNA-seq, MERFISH, Visium HD, and Xenium spatial transcriptomics. The project is actively evolving, and feedback from researchers using real datasets is welcome.
 
 ---
 
@@ -113,7 +113,7 @@ Users can interactively adjust parameters including:
 
 ## 🧬 Spatial transcriptomics
 
-BioWorkbench currently includes spatial workflows for **MERFISH** and **Visium HD** datasets. The workflows share spatial visualization and domain-analysis capabilities while keeping modality-specific quality control separate.
+BioWorkbench currently includes spatial workflows for **MERFISH**, **Visium HD**, and **Xenium** datasets. The workflows share spatial visualization and domain-analysis capabilities while keeping modality-specific quality control separate.
 
 ### MERFISH
 
@@ -148,6 +148,20 @@ The Visium HD workflow supports spatial expression data represented as AnnData, 
 * Visualization of observation metadata and expression in tissue coordinates
 
 Visium HD uses the standard gene-expression QC and doublet-detection path.
+
+### Xenium
+
+The Xenium workflow supports 10x-style spatial AnnData objects and includes:
+
+* Spatial-coordinate validation from `obsm["spatial"]` or centroid columns
+* QC metrics from negative-probe and negative-codeword counts
+* Nucleus-to-cell area ratio
+* Gene/cell filtering and configurable negative-control thresholds
+* Flagging of cells above either threshold, with a control-passing dataset for downstream analysis
+* PCA, UMAP, Leiden clustering, and spatial-domain identification
+* Visualization of QC metrics and expression in tissue coordinates
+
+Xenium control flags are separate from MERFISH blank-probe and single-cell doublet metrics.
 
 ### Spatial coordinates
 
@@ -356,6 +370,10 @@ The MERFISH input must include `center_x` and `center_y` in `adata.obs`; blank-p
 
 The Visium HD workflow expects a spatially aware AnnData (`.h5ad`) object with a numeric expression matrix in `adata.X` and two-dimensional coordinates in `adata.obsm["spatial"]`. Coordinates must be finite and provided for each observation. BioWorkbench validates the data and exposes the coordinate columns for spatial plotting. Non-empty `adata.uns["spatial"]` metadata is not required by the current workflow.
 
+### Xenium input
+
+The Xenium workflow expects an AnnData (`.h5ad`) object with a numeric, non-negative expression matrix in `adata.X` and these cell-level `adata.obs` columns: `control_probe_counts`, `control_codeword_counts`, `cell_area`, and `nucleus_area`. Spatial coordinates may be in `adata.obsm["spatial"]` or in both `x_centroid` and `y_centroid` observation columns. Loading validates these fields, standardizes coordinates in `obsm["spatial"]`, and derives negative-control percentages and `nucleus_ratio`.
+
 ---
 
 # ⚙️ Configuration
@@ -379,6 +397,8 @@ spatial:
     ...
   Visium HD:
     ...
+  Xenium:
+    ...
 ```
 
 Configuration values provide defaults for the interactive workflows and can be adjusted through the application where supported.
@@ -394,6 +414,7 @@ The current beta focuses on:
 * Single-cell RNA-seq
 * MERFISH spatial transcriptomics
 * Visium HD spatial transcriptomics
+* Xenium spatial transcriptomics
 * Quality control and filtering
 * Dimensionality reduction and clustering
 * Marker-gene analysis
@@ -646,6 +667,9 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 * [x] Visium HD AnnData input and spatial-coordinate validation
 * [x] Visium HD QC and filtering
 * [x] Visium HD clustering and spatial-domain identification
+* [x] Xenium AnnData input and validation
+* [x] Xenium negative-control QC and filtering
+* [x] Xenium clustering and spatial-domain identification
 * [x] Spatial coordinate visualization
 * [x] Spatial annotation visualization
 * [x] Spatial-domain identification
@@ -672,7 +696,6 @@ BioWorkbench is being developed incrementally, with emphasis on making the exist
 
 ### Additional spatial technologies
 
-* [ ] Xenium
 * [ ] CosMX
 
 ### Spatial analysis

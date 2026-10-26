@@ -147,6 +147,8 @@ THRESHOLD_RANGES = {
     "max_mt_percentage": (0.0, 100.0),
     "expected_doublet_rate": (0.0, 1.0),
     "blank_max_percentage": (0.0, 100.0),
+    "negative_probe_max_percentage": (0.0, 100.0),
+    "negative_codeword_max_percentage": (0.0, 100.0),
 }
 
 
@@ -170,7 +172,14 @@ def validate_filter_thresholds(**thresholds):
     return errors
 
 
-def preview_filter_impact(adata, min_genes, min_cells, max_mt_percentage=None):
+def preview_filter_impact(
+    adata,
+    min_genes,
+    min_cells,
+    max_mt_percentage=None,
+    negative_probe_max_percentage=None,
+    negative_codeword_max_percentage=None,
+):
     """
     Count what `data_filtering` would remove, without modifying `adata`.
 
@@ -195,6 +204,23 @@ def preview_filter_impact(adata, min_genes, min_cells, max_mt_percentage=None):
         mt = adata.obs["pct_counts_mt"].to_numpy(dtype=float)[keep_obs]
         mt_removed = int((~(mt < max_mt_percentage)).sum())
 
+    controls_flagged = None
+    if (
+        negative_probe_max_percentage is not None
+        and negative_codeword_max_percentage is not None
+        and {"negative_probe_pct", "negative_codeword_pct"}.issubset(
+            adata.obs.columns
+        )
+    ):
+        probe_pct = adata.obs["negative_probe_pct"].to_numpy(dtype=float)[keep_obs]
+        codeword_pct = adata.obs["negative_codeword_pct"].to_numpy(dtype=float)[keep_obs]
+        controls_flagged = int(
+            (
+                (probe_pct > negative_probe_max_percentage)
+                | (codeword_pct > negative_codeword_max_percentage)
+            ).sum()
+        )
+
     n_after_cells = int(keep_obs.sum())
     return {
         "n_obs": int(adata.n_obs),
@@ -202,6 +228,7 @@ def preview_filter_impact(adata, min_genes, min_cells, max_mt_percentage=None):
         "obs_removed_min_genes": int(adata.n_obs - n_after_cells),
         "vars_removed_min_cells": int(adata.n_vars - keep_vars.sum()),
         "obs_removed_mito": mt_removed,
+        "obs_flagged_controls": controls_flagged,
         "obs_remaining": n_after_cells - (mt_removed or 0),
         "vars_remaining": int(keep_vars.sum()),
     }
@@ -214,7 +241,9 @@ def data_filtering(adata,
            expected_doublet_rate: float = 0.05,
            blank_max_percentage: float = 5,
            is_spatial: bool = False,
-           modality: str = None) -> sc.AnnData:
+           modality: str = None,
+           negative_probe_max_percentage: float = 5,
+           negative_codeword_max_percentage: float = 5) -> sc.AnnData:
     """
     Filter an AnnData object based on quality control metrics.
 
@@ -233,9 +262,13 @@ def data_filtering(adata,
         Legacy flag: True selects the MERFISH (blank-probe) path. Ignored when
         `modality` is given.
     - modality: str, optional
-        One of "single_cell", "visium_hd" or "merfish". Visium HD uses the
-        single-cell QC path (mitochondrial filter, doublet flagging) and needs
-        obsm['spatial'], never blank-probe fields or center_x/center_y.
+        One of "single_cell", "visium_hd", "merfish" or "xenium". Visium HD
+        uses the single-cell QC path. Xenium flags observations exceeding either
+        negative-control percentage threshold without removing them.
+    - negative_probe_max_percentage: float, optional
+        Maximum negative-probe percentage before a Xenium observation is flagged.
+    - negative_codeword_max_percentage: float, optional
+        Maximum negative-codeword percentage before a Xenium observation is flagged.
         Per-step counts are stored in `adata.uns["filtering_report"]`.
     - blank_max_percentage: float, optional
         Maximum percentage of blank counts allowed in a cell for spatial datasets. Default is 5%.
@@ -251,6 +284,14 @@ def data_filtering(adata,
     if modality not in MODALITIES:
         raise ValueError(f"Unknown modality {modality!r}; expected one of {MODALITIES}.")
 
+    if modality == "xenium":
+        threshold_errors = validate_filter_thresholds(
+            negative_probe_max_percentage=negative_probe_max_percentage,
+            negative_codeword_max_percentage=negative_codeword_max_percentage,
+        )
+        if threshold_errors:
+            raise ValueError("Invalid Xenium filtering thresholds: " + " ".join(threshold_errors))
+
     if modality == "visium_hd":
         availability = qc_metric_availability(adata, modality)
         if availability["missing_required"]:
@@ -259,6 +300,16 @@ def data_filtering(adata,
                 + ", ".join(availability["missing_required"])
                 + ". Load the dataset with the Visium HD technology selected."
             )
+    elif modality == "xenium":
+        availability = qc_metric_availability(adata, modality)
+        if availability["missing_required"]:
+            raise ValueError(
+                "Xenium filtering requires "
+                + ", ".join(availability["missing_required"])
+                + ". Load the dataset with the Xenium technology selected."
+            )
+        
+        print(availability)
 
     report = []
 
@@ -277,6 +328,31 @@ def data_filtering(adata,
             report, "blank_probes", "flagged", before, adata,
             n_flagged=_count_true(adata, "is_blank"),
             note="Flagged in obs['is_blank']; observations are not removed.",
+        )
+    elif modality == "xenium":
+        before = adata.shape
+        high_negative_probes = (
+            adata.obs["negative_probe_pct"] > negative_probe_max_percentage
+        ).fillna(False)
+        high_negative_codewords = (
+            adata.obs["negative_codeword_pct"] > negative_codeword_max_percentage
+        ).fillna(False)
+        adata.obs["is_xenium_control"] = (
+            high_negative_probes | high_negative_codewords
+        )
+        _record_step(
+            report,
+            "negative_controls",
+            "flagged",
+            before,
+            adata,
+            n_flagged=_count_true(adata, "is_xenium_control"),
+            note=(
+                "Flagged in obs['is_xenium_control'] when negative-probe "
+                f"percentage exceeds {negative_probe_max_percentage}% or "
+                "negative-codeword percentage exceeds "
+                f"{negative_codeword_max_percentage}%; observations are not removed."
+            ),
         )
     else:
         before = adata.shape
