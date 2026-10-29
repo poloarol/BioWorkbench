@@ -13,7 +13,8 @@ spatial:
   Xenium:
     min_genes: 15
     min_cells: 3
-    blank_threshold: 5
+    cprobes: 5
+    cwords: 5
 
   CosMX:
     min_genes: 15

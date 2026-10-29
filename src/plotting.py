@@ -57,6 +57,34 @@ def plot_qc_metrics(
         The matplotlib figure containing the QC metrics plots.
     """
 
+    if is_spatial and platform is not None and platform.lower() == "xenium":
+        fig, axs = plt.subplots(1, 3, figsize=WIDE_FIGSIZE)
+        
+        axs[0].set_title("Total transcripts per cell")
+        sns.histplot(adata.obs["log1p_total_counts"], kde=False, ax=axs[0])
+
+        axs[1].set_title("Unique transcripts per cell")
+        sns.histplot(adata.obs["log1p_n_genes_by_counts"], kde=False, ax=axs[1])
+
+        axs[2].set_title("Negative-control percentages")
+        sns.histplot(
+            adata.obs["negative_probe_pct"],
+            kde=False,
+            ax=axs[2],
+            label="Negative probes",
+            alpha=0.6,
+        )
+        sns.histplot(
+            adata.obs["negative_codeword_pct"],
+            kde=False,
+            ax=axs[2],
+            label="Negative codewords",
+            alpha=0.6,
+        )
+        axs[2].legend()
+        fig.tight_layout()
+        return fig
+
     if is_spatial and platform is not None and "visium" not in platform.lower():
         fig, axs = plt.subplots(1, 3, figsize=WIDE_FIGSIZE)
 

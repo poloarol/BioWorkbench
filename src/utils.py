@@ -1,4 +1,6 @@
 
+import warnings
+
 import scanpy as sc
 import squidpy as sq
 import numpy as np
@@ -20,7 +22,7 @@ def color_options(adata: sc.AnnData) -> list[str]:
     ]
 
 
-MODALITIES = ("single_cell", "visium_hd", "merfish")
+MODALITIES = ("single_cell", "visium_hd", "merfish", "xenium")
 
 # Per-modality QC contract. "required" metrics must exist before filtering,
 # "optional" ones are used when present, and "unavailable" ones are never
@@ -42,6 +44,18 @@ QC_METRIC_CONTRACT = {
     "merfish": {
         "required_obs": ("total_counts", "blank_counts", "pct_counts_blank"),
         "optional_obs": ("n_genes_by_counts", "volume"),
+        "unavailable_obs": ("pct_counts_mt", "predicted_doublet"),
+        "required_obsm": ("spatial",),
+    },
+    "xenium": {
+        "required_obs": (
+            "total_counts",
+            "n_genes_by_counts",
+            "negative_probe_pct",
+            "negative_codeword_pct",
+            "nucleus_ratio",
+        ),
+        "optional_obs": ("control_probe_counts", "control_codeword_counts"),
         "unavailable_obs": ("pct_counts_mt", "predicted_doublet"),
         "required_obsm": ("spatial",),
     },
@@ -106,6 +120,11 @@ def load_data(filepath: str,
                 validate_visium_hd_adata(adata)
                 _calculate_qc_metrics(adata, is_spatial=False)
                 _add_visium_center_columns(adata)
+            elif platform is not None and platform.lower() == "xenium":
+                validate_xenium_adata(adata)
+                _calculate_qc_metrics(adata, is_spatial=True)
+                _add_xenium_spatial(adata)
+                _add_xenium_qc(adata)
     # else:
     #     adata = sc.read(filepath, backed='r')
     #     obs_index = slice(None) if cell_columns is None else cell_columns
@@ -138,6 +157,108 @@ def _validate_identifiers(names: pd.Index, label: str) -> None:
         raise ValueError(
             f"{label} identifiers must be non-empty; found {int(blank.sum())} "
             "empty or missing identifier(s)."
+        )
+
+
+def validate_xenium_adata(adata: sc.AnnData) -> None:
+    """Validate the Xenium AnnData fields needed for QC and spatial analysis."""
+    if not isinstance(adata, sc.AnnData):
+        raise ValueError(
+            f"Expected an AnnData object; received {type(adata).__name__}."
+        )
+    if adata.n_obs == 0 or adata.n_vars == 0:
+        raise ValueError(
+            "The Xenium dataset has no observations or no genes "
+            f"(shape {adata.n_obs} x {adata.n_vars})."
+        )
+
+    _validate_identifiers(adata.obs_names, "Observation")
+    _validate_identifiers(adata.var_names, "Gene")
+
+    required_columns = (
+        "control_probe_counts",
+        "control_codeword_counts",
+        "cell_area",
+        "nucleus_area",
+    )
+    missing = [column for column in required_columns if column not in adata.obs]
+    if missing:
+        raise ValueError(
+            "Xenium data is missing required obs columns: "
+            + ", ".join(missing)
+            + "."
+        )
+
+    # Cells without a segmented nucleus have no defined area; treat as 0.
+    nucleus = adata.obs["nucleus_area"]
+    if pd.api.types.is_numeric_dtype(nucleus) and not pd.api.types.is_bool_dtype(nucleus):
+        nucleus_values = nucleus.to_numpy(dtype=np.float64, copy=True)
+        undefined = ~np.isfinite(nucleus_values)
+        if undefined.any():
+            warnings.warn(
+                f"{int(undefined.sum())} cell(s) have missing or non-finite "
+                "'nucleus_area'; setting them to 0.",
+                stacklevel=2,
+            )
+            nucleus_values[undefined] = 0.0
+            adata.obs["nucleus_area"] = nucleus_values
+
+    for column in required_columns:
+        values = adata.obs[column]
+        if not pd.api.types.is_numeric_dtype(values) or pd.api.types.is_bool_dtype(values):
+            raise ValueError(f"adata.obs['{column}'] must contain numeric values.")
+        numeric_values = values.to_numpy(dtype=np.float64)
+        if not np.isfinite(numeric_values).all():
+            raise ValueError(
+                f"adata.obs['{column}'] contains missing or non-finite values."
+            )
+        if np.any(numeric_values < 0):
+            raise ValueError(f"adata.obs['{column}'] cannot contain negative values.")
+    if np.any(adata.obs["cell_area"].to_numpy(dtype=np.float64) <= 0):
+        raise ValueError("adata.obs['cell_area'] must be greater than zero.")
+
+    if "spatial" in adata.obsm:
+        raw_coordinates = adata.obsm["spatial"]
+        if sparse.issparse(raw_coordinates):
+            raise ValueError("adata.obsm['spatial'] must be a dense numeric array.")
+        if isinstance(raw_coordinates, pd.DataFrame):
+            raw_coordinates = raw_coordinates.to_numpy()
+    elif {"x_centroid", "y_centroid"}.issubset(adata.obs.columns):
+        raw_coordinates = adata.obs[["x_centroid", "y_centroid"]].to_numpy()
+    else:
+        raise ValueError(
+            "Xenium data requires adata.obsm['spatial'] or both "
+            "adata.obs['x_centroid'] and adata.obs['y_centroid']."
+        )
+
+    coordinates = np.asarray(raw_coordinates)
+    if coordinates.shape != (adata.n_obs, 2):
+        raise ValueError(
+            "Xenium spatial coordinates must have shape "
+            f"({adata.n_obs}, 2); received {coordinates.shape}."
+        )
+    if coordinates.dtype == bool:
+        raise ValueError("Xenium spatial coordinates must be numeric, not boolean.")
+    try:
+        coordinates = coordinates.astype(np.float64, copy=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Xenium spatial coordinates must be numeric.") from exc
+    if not np.isfinite(coordinates).all():
+        raise ValueError("Xenium spatial coordinates must be finite.")
+
+    matrix = adata.X
+    if matrix is None or not (
+        sparse.issparse(matrix) or isinstance(matrix, np.ndarray)
+    ):
+        raise ValueError(
+            "Xenium expression data must be a dense or sparse numeric matrix."
+        )
+    values = matrix.data if sparse.issparse(matrix) else np.asarray(matrix)
+    if values.dtype == bool or not np.issubdtype(values.dtype, np.number):
+        raise ValueError("Xenium expression data must contain numeric values.")
+    if not np.isfinite(values).all() or np.any(values < 0):
+        raise ValueError(
+            "Xenium expression data must contain finite, non-negative values."
         )
 
 
@@ -395,6 +516,75 @@ def _add_merfish_qc(adata: sc.AnnData) -> None:
         where=total > 0,
     )
     adata.obsm["spatial"] = adata.obs[["center_x", "center_y"]].to_numpy(dtype=float)
+
+
+def _add_xenium_spatial(adata: sc.AnnData) -> None:
+    """Normalize Xenium coordinates to obsm['spatial'] and plotting columns."""
+    if "spatial" not in adata.obsm:
+        adata.obsm["spatial"] = adata.obs[
+            ["x_centroid", "y_centroid"]
+        ].to_numpy(dtype=np.float64)
+    _add_visium_center_columns(adata)
+
+
+def _add_xenium_qc(adata: sc.AnnData) -> None:
+    """Add per-cell Xenium negative-control QC percentages.
+
+    Adds:
+        - negative_probe_pct
+        - negative_codeword_pct
+
+    Requires control_probe_counts, control_codeword_counts, and
+    total_counts in adata.obs. Also derives nucleus_ratio from the cell and
+    nucleus areas. Cells with zero total counts receive NaN percentages.
+    """
+    required_columns = {
+        "total_counts",
+        "control_probe_counts",
+        "control_codeword_counts",
+    }
+    missing = required_columns.difference(adata.obs.columns)
+
+    if missing:
+        raise ValueError(
+            f"Cannot calculate Xenium QC metrics; missing obs columns: "
+            f"{sorted(missing)}"
+        )
+
+    total = adata.obs["total_counts"].to_numpy(dtype=np.float64)
+    control_probes = adata.obs["control_probe_counts"].to_numpy(
+        dtype=np.float64
+    )
+    control_codewords = adata.obs["control_codeword_counts"].to_numpy(
+        dtype=np.float64
+    )
+
+    if (
+        np.any(~np.isfinite(total))
+        or np.any(~np.isfinite(control_probes))
+        or np.any(~np.isfinite(control_codewords))
+    ):
+        raise ValueError("Xenium QC count columns must contain finite values.")
+
+    if np.any(total < 0) or np.any(control_probes < 0) or np.any(
+        control_codewords < 0
+    ):
+        raise ValueError("Xenium QC counts cannot be negative.")
+
+    def _percentage(counts: np.ndarray) -> np.ndarray:
+        return np.divide(
+            counts * 100.0,
+            total,
+            out=np.full(adata.n_obs, np.nan, dtype=np.float64),
+            where=total > 0,
+        )
+
+    adata.obs["negative_probe_pct"] = _percentage(control_probes)
+    adata.obs["negative_codeword_pct"] = _percentage(control_codewords)
+    adata.obs["nucleus_ratio"] = (
+        adata.obs["nucleus_area"].to_numpy(dtype=np.float64)
+        / adata.obs["cell_area"].to_numpy(dtype=np.float64)
+    )
 
 # def load_data(
 #     filepath: str,

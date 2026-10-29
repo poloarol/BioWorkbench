@@ -100,6 +100,8 @@ def clear_filtered_results():
     st.session_state.adatas.pop("filtered_wout_doublets", None)
     st.session_state.adatas.pop("filtered_w_blanks", None)
     st.session_state.adatas.pop("filtered_wout_blanks", None)
+    st.session_state.adatas.pop("filtered_w_xenium_controls", None)
+    st.session_state.adatas.pop("filtered_wout_xenium_controls", None)
 
 
 def clear_downstream_results():
@@ -176,6 +178,8 @@ with st.sidebar:
             spatial_keys = {
                 "filtered_w_blanks",
                 "filtered_wout_blanks",
+                "filtered_w_xenium_controls",
+                "filtered_wout_xenium_controls",
             }
             contains_spatial_data = bool(
                 spatial_keys.intersection(imported_adatas)
@@ -211,6 +215,8 @@ with st.sidebar:
                     "filtered_wout_doublets",
                     "filtered_w_blanks",
                     "filtered_wout_blanks",
+                    "filtered_w_xenium_controls",
+                    "filtered_wout_xenium_controls",
                 )
             )
             st.session_state["module_score"] = sorted({
@@ -255,8 +261,9 @@ with st.sidebar:
     is_spatial = st.session_state['spatial_technology'] != "None — single-cell dataset"
     st.session_state["is_spatial"] = is_spatial
     # Visium HD uses the single-cell QC (mitochondrial %, doublets); only
-    # MERFISH is filtered on blank probes.
+    # MERFISH is filtered on blank probes; Xenium uses negative controls.
     uses_blanks = st.session_state['spatial_technology'] == "MERFISH"
+    uses_xenium = st.session_state['spatial_technology'] == "Xenium"
     
     config = get_filtering_config(
         "spatial" if is_spatial else "single_cell",
@@ -395,6 +402,8 @@ with st.sidebar:
     blank_threshold: float = 0.0
     max_mt_percentage: float = 0.0
     exp_doublet_rate: float = 0.0
+    cprobes_threshold: float = 5.0
+    cwords_threshold: float = 5.0
 
     with st.form("filter_form"):
         min_genes_default = get_saved_number(
@@ -439,7 +448,7 @@ with st.sidebar:
             ),
         )
         
-        if uses_blanks:
+        if st.session_state['spatial_technology'].lower() == "merfish":
             
             blank_threshold_default = get_saved_number(
                 "blank_threshold",
@@ -457,6 +466,45 @@ with st.sidebar:
                     "Observations with a blank-probe percentage above this "
                     "are FLAGGED in obs['is_blank'], and the page later "
                     "builds a blank-free copy. Percent, 0-100."
+                ),
+            )
+
+        elif st.session_state['spatial_technology'].lower() == "xenium":
+            cprobes_default = get_saved_number(
+                "cprobes",
+                float(config.get("cprobes", 5.0)),
+                0.0,
+                100.0,
+            )
+
+            cwords_default = get_saved_number(
+                "cwords",
+                float(config.get("cwords", 5.0)),
+                0.0,
+                100.0,
+            )
+
+            cprobes_threshold = st.number_input(
+                "Negative DNA probes threshold",
+                min_value=0.0,
+                max_value=100.0,
+                value=cprobes_default,
+                step=1.0,
+                help=(
+                    "Flag cells with a negative-probe percentage above "
+                    "this threshold. Percent, 0-100."
+                ),
+            )
+
+            cwords_threshold = st.number_input(
+                "Negative decoding threshold",
+                min_value=0.0,
+                max_value=100.0,
+                value=cwords_default,
+                step=1.0,
+                help=(
+                    "Flag cells with a negative-codeword percentage above "
+                    "this threshold. Percent, 0-100."
                 ),
             )
             
@@ -530,6 +578,11 @@ with st.sidebar:
                     {"blank_max_percentage": blank_threshold}
                     if uses_blanks
                     else {
+                        "negative_probe_max_percentage": cprobes_threshold,
+                        "negative_codeword_max_percentage": cwords_threshold,
+                    }
+                    if uses_xenium
+                    else {
                         "max_mt_percentage": max_mt_percentage,
                         "expected_doublet_rate": exp_doublet_rate,
                     }
@@ -544,7 +597,13 @@ with st.sidebar:
                 adata,
                 min_genes,
                 min_cells,
-                None if uses_blanks else max_mt_percentage,
+                None if uses_blanks or uses_xenium else max_mt_percentage,
+                negative_probe_max_percentage=(
+                    cprobes_threshold if uses_xenium else None
+                ),
+                negative_codeword_max_percentage=(
+                    cwords_threshold if uses_xenium else None
+                ),
             )
             summary = (
                 f"These thresholds remove {impact['obs_removed_min_genes']:,} "
@@ -558,8 +617,17 @@ with st.sidebar:
                     f", then {impact['obs_removed_mito']:,} observations "
                     f"with mitochondrial percentage >= {max_mt_percentage}"
                 )
-            summary += f". {impact['obs_remaining']:,} observations remain."
-            if impact["obs_remaining"] == 0 or impact["vars_remaining"] == 0:
+            remaining_after_controls = impact["obs_remaining"]
+            if uses_xenium:
+                flagged_controls = impact["obs_flagged_controls"] or 0
+                remaining_after_controls -= flagged_controls
+                summary += (
+                    f", flagging {flagged_controls:,} cells with excessive "
+                    f"negative-probe or negative-codeword percentages; "
+                    f"{remaining_after_controls:,} pass both control thresholds"
+                )
+            summary += f". {impact['obs_remaining']:,} observations remain after filtering."
+            if remaining_after_controls == 0 or impact["vars_remaining"] == 0:
                 st.warning(summary + " Nothing would be left: relax the thresholds.")
             else:
                 st.info(summary)
@@ -567,17 +635,23 @@ with st.sidebar:
                 with st.spinner("Applying filters..."):
                     adata_filtered = data_filtering(
                         adata,
-                        min_genes=float(min_genes),
-                        min_cells=float(min_cells),
+                        min_genes=int(min_genes),
+                        min_cells=int(min_cells),
                         max_mt_percentage=float(max_mt_percentage),
                         expected_doublet_rate=float(exp_doublet_rate),
                         is_spatial=uses_blanks,
                         modality=(
                             "visium_hd"
                             if spatial_technology == "Visium HD"
-                            else "merfish" if uses_blanks else "single_cell"
+                            else "merfish"
+                            if uses_blanks
+                            else "xenium"
+                            if uses_xenium
+                            else "single_cell"
                         ),
-                        blank_max_percentage=float(blank_threshold)
+                        blank_max_percentage=float(blank_threshold),
+                        negative_probe_max_percentage=float(cprobes_threshold),
+                        negative_codeword_max_percentage=float(cwords_threshold),
                     )
 
                 # New filtering results invalidate any analysis built on the old ones.
@@ -603,6 +677,13 @@ with st.sidebar:
                         ] = adata_filtered
                         st.session_state.adatas[
                             "filtered_wout_blanks"
+                        ] = adata_filtered.copy()
+                    elif uses_xenium:
+                        st.session_state.adatas[
+                            "filtered_w_xenium_controls"
+                        ] = adata_filtered
+                        st.session_state.adatas[
+                            "filtered_wout_xenium_controls"
                         ] = adata_filtered.copy()
                     else:
                         st.session_state.adatas[
@@ -641,6 +722,19 @@ with st.sidebar:
                             ] = adata_filtered
                             
                             st.session_state.filtered = True
+                    elif uses_xenium:
+                        control_mask = (
+                            adata_filtered.obs["is_xenium_control"]
+                            .fillna(False)
+                            .astype(bool)
+                        )
+                        st.session_state.adatas[
+                            "filtered_w_xenium_controls"
+                        ] = adata_filtered
+                        st.session_state.adatas[
+                            "filtered_wout_xenium_controls"
+                        ] = adata_filtered[~control_mask].copy()
+                        st.session_state.filtered = True
                     else:
                         # Make sure predicted_doublet exists before using it.
                         if "predicted_doublet" not in adata_filtered.obs.columns:
@@ -694,6 +788,9 @@ base_adata = get_base_adata()
 if st.session_state['spatial_technology'] == "MERFISH":
     filtered_adata = get_adata("filtered_w_blanks")
     singlet_adata = get_adata("filtered_wout_blanks")
+elif st.session_state['spatial_technology'] == "Xenium":
+    filtered_adata = get_adata("filtered_w_xenium_controls")
+    singlet_adata = get_adata("filtered_wout_xenium_controls")
 elif st.session_state['spatial_technology'] == "None — single-cell dataset" or st.session_state['spatial_technology'] == "Visium HD":
     filtered_adata = get_adata("filtered_w_doublets")
     singlet_adata = get_adata("filtered_wout_doublets")
@@ -768,7 +865,13 @@ if filtered_adata is None:
 # ============================================================
 
 
-ttl: str = 'Blank' if st.session_state['spatial_technology'] == "MERFISH" else 'Doublet'
+ttl: str = (
+    "Blank"
+    if uses_blanks
+    else "Xenium-control"
+    if uses_xenium
+    else "Doublet"
+)
 
 if selected == "Top Gene":
     if st.session_state['spatial_technology'] == "MERFISH":
@@ -945,8 +1048,14 @@ elif selected == "QC Metrics":
         fig_two = plot_qc_metrics(filtered_adata, is_spatial=is_spatial, platform=st.session_state['spatial_technology'])
         fig_three = plot_qc_metrics(singlet_adata, is_spatial=is_spatial, platform=st.session_state['spatial_technology'])
         
-        if st.session_state['spatial_technology'] in ("MERFISH", "Xenium", "CosMx"):
+        if st.session_state['spatial_technology'] in ("MERFISH", "CosMx"):
             color_by = ["is_blank", "log1p_n_genes_by_counts", "log1p_total_counts"]
+        elif uses_xenium:
+            color_by = [
+                "negative_probe_pct",
+                "negative_codeword_pct",
+                "log1p_n_genes_by_counts",
+            ]
         else:
             color_by = ["log1p_n_genes_by_counts", "log1p_total_counts", "pct_counts_mt"]
 
@@ -1209,6 +1318,37 @@ elif selected == "Statistics":
                     f"({perc_high_blank:.2f}%) "
                     "are predicted blanks."
                 )
+    elif uses_xenium:
+        predicted_controls = get_bool_obs_column(
+            filtered_adata,
+            "is_xenium_control",
+        )
+
+        if predicted_controls is None:
+            st.info("No Xenium negative-control flag information is available.")
+        elif len(predicted_controls) == 0:
+            st.info(
+                "No cells remain after filtering, so control statistics "
+                "cannot be calculated."
+            )
+        else:
+            high_controls = int(predicted_controls.sum())
+            passing_controls = len(predicted_controls) - high_controls
+            high_percentage = high_controls / len(predicted_controls) * 100
+
+            fig = create_percentage_bar(
+                values=[passing_controls, high_controls],
+                labels=["Within thresholds", "Above threshold"],
+                total_label="Cells",
+                colors=["#4CAF50", "#E74C3C"],
+                counts=[passing_controls, high_controls],
+            )
+            st.subheader("Xenium Negative-Control Statistics")
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption(
+                f"{high_controls:,} of {len(predicted_controls):,} cells "
+                f"({high_percentage:.2f}%) exceed at least one control threshold."
+            )
     else:
 
         # ----------------------------------------------------
@@ -1428,6 +1568,8 @@ st.session_state.params.update({
     "min_genes": min_genes,
     "min_cells": min_cells,
     "blank_threshold": blank_threshold,
+    "cprobes": cprobes_threshold,
+    "cwords": cwords_threshold,
     "max_mt_percentage": max_mt_percentage,
     "exp_doublet_rate": exp_doublet_rate,
     "is_spatial": is_spatial,
