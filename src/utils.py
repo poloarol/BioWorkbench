@@ -122,9 +122,32 @@ def load_data(filepath: str,
                 _add_visium_center_columns(adata)
             elif platform is not None and platform.lower() == "xenium":
                 validate_xenium_adata(adata)
+                control_total_counts = (
+                    adata.obs["total_counts"].to_numpy(
+                        dtype=np.float64, copy=True
+                    )
+                    if "total_counts" in adata.obs
+                    else np.asarray(adata.X.sum(axis=1)).ravel().astype(
+                        np.float64, copy=True
+                    )
+                )
+                if "feature_types" in adata.var:
+                    gene_expression = (
+                        adata.var["feature_types"]
+                        .astype(str)
+                        .str.strip()
+                        .eq("Gene Expression")
+                    )
+                    if not gene_expression.any():
+                        raise ValueError(
+                            "Xenium data contains no Gene Expression features."
+                        )
+                    adata = adata[:, gene_expression].copy()
                 _calculate_qc_metrics(adata, is_spatial=True)
                 _add_xenium_spatial(adata)
-                _add_xenium_qc(adata)
+                _add_xenium_qc(
+                    adata, control_total_counts=control_total_counts
+                )
     # else:
     #     adata = sc.read(filepath, backed='r')
     #     obs_index = slice(None) if cell_columns is None else cell_columns
@@ -527,7 +550,10 @@ def _add_xenium_spatial(adata: sc.AnnData) -> None:
     _add_visium_center_columns(adata)
 
 
-def _add_xenium_qc(adata: sc.AnnData) -> None:
+def _add_xenium_qc(
+    adata: sc.AnnData,
+    control_total_counts: np.ndarray | None = None,
+) -> None:
     """Add per-cell Xenium negative-control QC percentages.
 
     Adds:
@@ -536,7 +562,8 @@ def _add_xenium_qc(adata: sc.AnnData) -> None:
 
     Requires control_probe_counts, control_codeword_counts, and
     total_counts in adata.obs. Also derives nucleus_ratio from the cell and
-    nucleus areas. Cells with zero total counts receive NaN percentages.
+    nucleus areas. For zero-total cells, zero controls receive 0% and positive
+    control counts receive infinite percentages.
     """
     required_columns = {
         "total_counts",
@@ -551,7 +578,11 @@ def _add_xenium_qc(adata: sc.AnnData) -> None:
             f"{sorted(missing)}"
         )
 
-    total = adata.obs["total_counts"].to_numpy(dtype=np.float64)
+    total = (
+        adata.obs["total_counts"].to_numpy(dtype=np.float64)
+        if control_total_counts is None
+        else np.asarray(control_total_counts, dtype=np.float64)
+    )
     control_probes = adata.obs["control_probe_counts"].to_numpy(
         dtype=np.float64
     )
@@ -559,6 +590,8 @@ def _add_xenium_qc(adata: sc.AnnData) -> None:
         dtype=np.float64
     )
 
+    if total.shape != (adata.n_obs,):
+        raise ValueError("Xenium total counts must contain one value per cell.")
     if (
         np.any(~np.isfinite(total))
         or np.any(~np.isfinite(control_probes))
@@ -572,10 +605,11 @@ def _add_xenium_qc(adata: sc.AnnData) -> None:
         raise ValueError("Xenium QC counts cannot be negative.")
 
     def _percentage(counts: np.ndarray) -> np.ndarray:
+        zero_total = total == 0
         return np.divide(
             counts * 100.0,
             total,
-            out=np.full(adata.n_obs, np.nan, dtype=np.float64),
+            out=np.where(zero_total & (counts > 0), np.inf, 0.0),
             where=total > 0,
         )
 

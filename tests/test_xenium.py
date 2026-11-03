@@ -60,6 +60,38 @@ def test_load_xenium_keeps_existing_spatial_coordinates(tmp_path):
     np.testing.assert_array_equal(loaded.obs["center_x"], [100, 200, 300, 400])
 
 
+def test_load_xenium_uses_vendor_totals_for_control_percentages(tmp_path):
+    adata = make_xenium()
+    adata.obs["total_counts"] = [30, 200, 400, 30]
+
+    loaded = load(adata, tmp_path)
+
+    np.testing.assert_allclose(loaded.obs["total_counts"], [30, 30, 30, 30])
+    np.testing.assert_allclose(loaded.obs["negative_probe_pct"], [0, 5, 0, 0])
+    np.testing.assert_allclose(loaded.obs["negative_codeword_pct"], [0, 0, 5, 0])
+
+
+def test_load_xenium_excludes_non_gene_expression_features(tmp_path):
+    adata = make_xenium(counts=np.full((4, 4), 10, dtype=np.int32))
+    adata.var["feature_types"] = [
+        "Gene Expression",
+        "Gene Expression",
+        "Negative Control Probe",
+        "Negative Control Codeword",
+    ]
+
+    loaded = load(adata, tmp_path)
+
+    assert loaded.var_names.tolist() == ["gene-0", "gene-1"]
+    np.testing.assert_allclose(loaded.obs["total_counts"], [20, 20, 20, 20])
+    np.testing.assert_allclose(
+        loaded.obs["negative_probe_pct"], [0, 25, 0, 0]
+    )
+    np.testing.assert_allclose(
+        loaded.obs["negative_codeword_pct"], [0, 0, 50, 0]
+    )
+
+
 def test_validate_xenium_requires_controls_areas_and_coordinates():
     adata = make_xenium()
     del adata.obs["control_probe_counts"]
@@ -151,6 +183,37 @@ def test_preview_filter_impact_reports_xenium_control_flags(tmp_path):
 
     assert impact["obs_flagged_controls"] == 2
     assert impact["obs_remaining"] == 4
+
+
+def test_zero_total_cell_with_positive_controls_is_flagged_consistently(tmp_path):
+    counts = np.full((4, 3), 10, dtype=np.int32)
+    counts[0] = 0
+    adata = make_xenium(counts=counts)
+    adata.obs.loc["cell-0", "control_probe_counts"] = 5
+    loaded = load(adata, tmp_path)
+
+    assert np.isinf(loaded.obs.loc["cell-0", "negative_probe_pct"])
+    assert loaded.obs.loc["cell-0", "negative_codeword_pct"] == 0
+
+    impact = preview_filter_impact(
+        loaded,
+        min_genes=0,
+        min_cells=0,
+        negative_probe_max_percentage=0,
+        negative_codeword_max_percentage=0,
+    )
+    filtered = data_filtering(
+        loaded,
+        min_genes=0,
+        min_cells=0,
+        modality="xenium",
+        negative_probe_max_percentage=0,
+        negative_codeword_max_percentage=0,
+    )
+
+    assert impact["obs_flagged_controls"] == 3
+    assert int(filtered.obs["is_xenium_control"].sum()) == 3
+    assert filtered.obs.loc["cell-0", "is_xenium_control"]
 
 
 @pytest.mark.parametrize(

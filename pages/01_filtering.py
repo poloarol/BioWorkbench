@@ -937,20 +937,28 @@ if selected == "Top Gene":
         st.markdown(
             "The following lists show the top spatially variable genes for each dataset subset."
         )
+        if any(
+            adata.n_obs < 3
+            for adata in (base_adata, filtered_adata, singlet_adata)
+        ):
+            st.info(
+                "Spatially variable genes require at least three cells; "
+                "smaller subsets are skipped."
+            )
         
         gene_set1 = (
             get_spatially_variable_genes(base_adata, n_top_genes=10)
-            if base_adata.n_obs and base_adata.n_vars
+            if base_adata.n_obs >= 3 and base_adata.n_vars
             else []
         )
         gene_set2 = (
             get_spatially_variable_genes(filtered_adata, n_top_genes=10)
-            if filtered_adata.n_obs and filtered_adata.n_vars
+            if filtered_adata.n_obs >= 3 and filtered_adata.n_vars
             else []
         )
         gene_set3 = (
             get_spatially_variable_genes(singlet_adata, n_top_genes=10)
-            if singlet_adata.n_obs and singlet_adata.n_vars
+            if singlet_adata.n_obs >= 3 and singlet_adata.n_vars
             else []
         )
 
