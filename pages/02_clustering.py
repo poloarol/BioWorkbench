@@ -89,7 +89,9 @@ adata = None
 
 filtered_key = (
     "filtered_wout_blanks"
-    if st.session_state.get('spatial_technology') in ("MERFISH", "Xenium", "CosMx")
+    if st.session_state.get("spatial_technology") in ("MERFISH", "CosMx")
+    else "filtered_wout_xenium_controls"
+    if st.session_state.get("spatial_technology") == "Xenium"
     else "filtered_wout_doublets"
 )
 filtered = st.session_state.get("adatas", {}).get(filtered_key)

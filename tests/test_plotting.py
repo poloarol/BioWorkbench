@@ -77,6 +77,30 @@ def test_plot_qc_metrics_single_cell_returns_figure(plotted_adata):
     assert len(fig.axes) == 3
 
 
+def test_plot_qc_metrics_xenium_returns_negative_control_panel(plotted_adata):
+    plotted_adata.obs["log1p_n_genes_by_counts"] = np.log1p(
+        plotted_adata.obs["n_genes_by_counts"]
+    )
+    plotted_adata.obs["log1p_total_counts"] = np.log1p(
+        plotted_adata.obs["total_counts"]
+    )
+    plotted_adata.obs["negative_probe_pct"] = [0, 1, 2, 3, 4]
+    plotted_adata.obs["negative_codeword_pct"] = [1, 2, 3, 4, 5]
+
+    fig = plotting.plot_qc_metrics(
+        plotted_adata,
+        is_spatial=True,
+        platform="Xenium",
+    )
+
+    assert len(fig.axes) == 3
+    assert [ax.get_title() for ax in fig.axes] == [
+        "Total transcripts per cell",
+        "Unique transcripts per cell",
+        "Negative-control percentages",
+    ]
+
+
 def test_qc_summary_calculates_expected_statistics(plotted_adata):
     result = plotting.qc_summary(plotted_adata)
 
